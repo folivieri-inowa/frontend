@@ -15,6 +15,7 @@ import {
   PlayCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
 interface InstrumentConfig {
   epic: string
@@ -33,9 +34,8 @@ interface StartParams {
   direction: 'LONG' | 'SHORT'
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-
 export function InstrumentsView() {
+  const { apiUrl } = useAuthStore()
   const [instruments, setInstruments] = useState<InstrumentConfig[]>([])
   const [pausedEpics, setPausedEpics] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,9 +62,10 @@ export function InstrumentsView() {
 
   // Fetch instruments from backend
   const fetchInstruments = async () => {
+    if (!apiUrl) return
     try {
       setLoading(true)
-      const response = await fetch(`${API_BASE}/api/instruments/whitelist`)
+      const response = await fetch(`${apiUrl}/api/instruments/whitelist`)
       const data = await response.json()
       
       if (data.success) {
@@ -83,8 +84,9 @@ export function InstrumentsView() {
 
   // Fetch paused epics
   const fetchPausedEpics = async () => {
+    if (!apiUrl) return
     try {
-      const response = await fetch(`${API_BASE}/api/instruments/paused`)
+      const response = await fetch(`${apiUrl}/api/instruments/paused`)
       const data = await response.json()
       
       if (data.success) {
@@ -134,7 +136,7 @@ export function InstrumentsView() {
     
     try {
       setActionLoading(selectedInstrument.epic)
-      const response = await fetch(`${API_BASE}/api/instruments/${selectedInstrument.epic}/start`, {
+      const response = await fetch(`${apiUrl}/api/instruments/${selectedInstrument.epic}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(startParams)
@@ -162,7 +164,7 @@ export function InstrumentsView() {
     
     try {
       setActionLoading(instrument.epic)
-      const response = await fetch(`${API_BASE}/api/instruments/${instrument.epic}/stop`, {
+      const response = await fetch(`${apiUrl}/api/instruments/${instrument.epic}/stop`, {
         method: 'POST'
       })
       
@@ -187,7 +189,7 @@ export function InstrumentsView() {
     
     try {
       setActionLoading(instrument.epic)
-      const response = await fetch(`${API_BASE}/api/instruments/${instrument.epic}/shutdown`, {
+      const response = await fetch(`${apiUrl}/api/instruments/${instrument.epic}/shutdown`, {
         method: 'POST'
       })
       
@@ -214,7 +216,7 @@ export function InstrumentsView() {
     
     try {
       setActionLoading(instrument.epic)
-      const response = await fetch(`${API_BASE}/api/instruments/${instrument.epic}/unpause`, {
+      const response = await fetch(`${apiUrl}/api/instruments/${instrument.epic}/unpause`, {
         method: 'POST'
       })
       
@@ -240,7 +242,7 @@ export function InstrumentsView() {
     
     try {
       setActionLoading(selectedInstrument.epic)
-      const response = await fetch(`${API_BASE}/api/instruments/${selectedInstrument.epic}/config`, {
+      const response = await fetch(`${apiUrl}/api/instruments/${selectedInstrument.epic}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configParams)

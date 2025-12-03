@@ -82,6 +82,9 @@ export const useAuthStore = create<AuthState>()(
             wsUrl,
           });
 
+          // Force page reload per reinizializzare tutti i componenti con i nuovi URL
+          window.location.reload();
+
           return true;
 
         } catch (err) {

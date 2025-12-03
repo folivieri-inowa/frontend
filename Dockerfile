@@ -18,16 +18,29 @@ ENV NODE_ENV=production
 # Build produzione
 RUN npm run build
 
-# Stage 2: Serve con nginx
-FROM nginx:alpine
+# Stage 2: Production con serve
+FROM node:20-alpine AS runner
 
-# Copia configurazione nginx custom
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copia build dal builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Installa serve globalmente
+RUN npm install -g serve
 
-# Esponi porta 80
-EXPOSE 80
+# Crea utente non-root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 frontend
 
-CMD ["nginx", "-g", "daemon off;"]
+# Copia build
+COPY --from=builder /app/dist ./dist
+
+# Cambia ownership
+RUN chown -R frontend:nodejs /app
+
+# Passa all'utente non-root
+USER frontend
+
+# Esponi porta
+EXPOSE 3000
+
+# Serve i file statici con SPA fallback
+CMD ["serve", "-s", "dist", "-l", "3000"]

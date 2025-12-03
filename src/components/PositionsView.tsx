@@ -12,6 +12,7 @@ import {
   Package
 } from 'lucide-react'
 import { cn, formatCurrency, formatNumber, getPnLColor } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Position {
   id: string
@@ -20,30 +21,40 @@ interface Position {
   direction: 'BUY' | 'SELL' | 'LONG' | 'SHORT'
   contracts: number
   openPrice: number
-  currentPrice: number
+  currentPrice?: number
   pnl: number
+  tpLevel?: number
   limitLevel?: number
   stopLevel?: number
-  createdAt: string
+  phase?: string
+  openedAt?: string
+  createdAt?: string
 }
 
 interface Order {
   id: string
   epic: string
   instrument: string
-  direction: 'BUY' | 'SELL'
-  size: number
-  level: number
+  direction: 'BUY' | 'SELL' | 'LONG' | 'SHORT'
+  contracts: number
+  entryPrice: number
   type: 'LIMIT' | 'STOP'
   limitLevel?: number
+  tpLevel?: number
   stopLevel?: number
-  createdAt: string
+  createdAt?: string
   status: string
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+interface GroupedData {
+  epic: string
+  instrument: string
+  positions: Position[]
+  orders: Order[]
+}
 
 export function PositionsView() {
+  const { apiUrl } = useAuthStore()
   const [positions, setPositions] = useState<Position[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,13 +63,14 @@ export function PositionsView() {
 
   // Fetch data
   const fetchData = async () => {
+    if (!apiUrl) return
     try {
       setLoading(true)
       
       // Fetch positions and orders in parallel
       const [posRes, ordRes] = await Promise.all([
-        fetch(`${API_BASE}/api/positions`),
-        fetch(`${API_BASE}/api/orders`)
+        fetch(`${apiUrl}/api/positions`),
+        fetch(`${apiUrl}/api/orders`)
       ])
       
       const posData = await posRes.json()
@@ -93,7 +105,7 @@ export function PositionsView() {
     
     try {
       setActionLoading(position.id)
-      const response = await fetch(`${API_BASE}/api/positions/${position.id}/close`, {
+      const response = await fetch(`${apiUrl}/api/positions/${position.id}/close`, {
         method: 'POST'
       })
       
@@ -118,7 +130,7 @@ export function PositionsView() {
     
     try {
       setActionLoading(order.id)
-      const response = await fetch(`${API_BASE}/api/orders/${order.id}/cancel`, {
+      const response = await fetch(`${apiUrl}/api/orders/${order.id}/cancel`, {
         method: 'POST'
       })
       
@@ -142,12 +154,40 @@ export function PositionsView() {
     return dir === 'BUY' || dir === 'LONG' ? 'LONG' : 'SHORT'
   }
 
-  // Group positions by epic
-  const groupedPositions = positions.reduce((acc, pos) => {
-    if (!acc[pos.epic]) acc[pos.epic] = []
-    acc[pos.epic].push(pos)
-    return acc
-  }, {} as Record<string, Position[]>)
+  // Group positions and orders by epic
+  const groupedByEpic = (): GroupedData[] => {
+    const epicMap = new Map<string, GroupedData>()
+    
+    // Add positions
+    positions.forEach(pos => {
+      if (!epicMap.has(pos.epic)) {
+        epicMap.set(pos.epic, {
+          epic: pos.epic,
+          instrument: pos.instrument || pos.epic,
+          positions: [],
+          orders: []
+        })
+      }
+      epicMap.get(pos.epic)!.positions.push(pos)
+    })
+    
+    // Add orders
+    orders.forEach(ord => {
+      if (!epicMap.has(ord.epic)) {
+        epicMap.set(ord.epic, {
+          epic: ord.epic,
+          instrument: ord.instrument || ord.epic,
+          positions: [],
+          orders: []
+        })
+      }
+      epicMap.get(ord.epic)!.orders.push(ord)
+    })
+    
+    return Array.from(epicMap.values()).sort((a, b) => a.instrument.localeCompare(b.instrument))
+  }
+
+  const grouped = groupedByEpic()
 
   // Calculate totals
   const totalPnL = positions.reduce((sum, p) => sum + (p.pnl || 0), 0)
@@ -237,179 +277,177 @@ export function PositionsView() {
         </div>
       )}
 
-      {/* Positions */}
+      {/* Grouped by Epic */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📊 Posizioni Aperte</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📊 Posizioni & Ordini per Strumento</h3>
         
-        {positions.length === 0 ? (
+        {grouped.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            Nessuna posizione aperta
+            Nessuna posizione o ordine
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {Object.entries(groupedPositions).map(([epic, epicPositions]) => (
-              <div key={epic} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                  <h4 className="font-medium text-gray-900 dark:text-white">
-                    {epicPositions[0]?.instrument || epic}
-                  </h4>
-                </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {epicPositions.map((position) => {
-                    const dir = normalizeDirection(position.direction)
-                    return (
-                      <motion.div
-                        key={position.id}
-                        className="p-4"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            {dir === 'LONG' ? (
-                              <TrendingUp className="w-5 h-5 text-green-500" />
-                            ) : (
-                              <TrendingDown className="w-5 h-5 text-red-500" />
-                            )}
-                            <span className={cn(
-                              "font-semibold",
-                              dir === 'LONG' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                            )}>
-                              {dir}
-                            </span>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {position.contracts} contratti
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleClosePosition(position)}
-                            disabled={actionLoading === position.id}
-                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-                            title="Chiudi posizione"
-                          >
-                            {actionLoading === position.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <X className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-gray-500 dark:text-gray-400">Apertura:</span>
-                            <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                              {formatNumber(position.openPrice)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 dark:text-gray-400">Corrente:</span>
-                            <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                              {formatNumber(position.currentPrice)}
-                            </span>
-                          </div>
-                          {position.limitLevel && (
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">TP:</span>
-                              <span className="ml-2 font-medium text-green-600 dark:text-green-400">
-                                {formatNumber(position.limitLevel)}
+            {grouped.map((group) => {
+              const groupPnL = group.positions.reduce((sum, p) => sum + (p.pnl || 0), 0)
+              return (
+                <div key={group.epic} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {group.instrument}
+                      </h4>
+                      {group.positions.length > 0 && (
+                        <span className={cn("text-sm font-medium", getPnLColor(groupPnL))}>
+                          {groupPnL >= 0 ? '+' : ''}{formatCurrency(groupPnL)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {group.positions.length} posizioni • {group.orders.length} ordini
+                    </p>
+                  </div>
+                  
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {/* Positions */}
+                    {group.positions.map((position) => {
+                      const dir = normalizeDirection(position.direction)
+                      const tpLevel = position.tpLevel || position.limitLevel
+                      return (
+                        <motion.div
+                          key={position.id}
+                          className="p-4 bg-blue-50/30 dark:bg-blue-900/10"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                POSIZIONE
+                              </span>
+                              {dir === 'LONG' ? (
+                                <TrendingUp className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <TrendingDown className="w-4 h-4 text-red-500" />
+                              )}
+                              <span className={cn(
+                                "font-semibold text-sm",
+                                dir === 'LONG' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                              )}>
+                                {dir} {position.contracts}
                               </span>
                             </div>
-                          )}
-                          <div>
-                            <span className="text-gray-500 dark:text-gray-400">P&L:</span>
-                            <span className={cn("ml-2 font-bold", getPnLColor(position.pnl))}>
-                              {position.pnl >= 0 ? '+' : ''}{formatCurrency(position.pnl)}
-                            </span>
+                            <button
+                              onClick={() => handleClosePosition(position)}
+                              disabled={actionLoading === position.id}
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                              title="Chiudi posizione"
+                            >
+                              {actionLoading === position.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <X className="w-4 h-4" />
+                              )}
+                            </button>
                           </div>
-                        </div>
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Orders */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📋 Ordini Pendenti</h3>
-        
-        {orders.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            Nessun ordine pendente
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Strumento</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Direzione</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 dark:text-gray-400">Tipo</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 dark:text-gray-400">Prezzo</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 dark:text-gray-400">Contratti</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-600 dark:text-gray-400">TP</th>
-                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-600 dark:text-gray-400">Azioni</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {orders.map((order) => {
-                  const dir = normalizeDirection(order.direction)
-                  return (
-                    <motion.tr
-                      key={order.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/30"
-                    >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                        {order.instrument || order.epic}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-                          dir === 'LONG' 
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        )}>
-                          {dir === 'LONG' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          {dir}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                        {order.type}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                        {formatNumber(order.level)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
-                        {order.size}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400">
-                        {order.limitLevel ? formatNumber(order.limitLevel) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleCancelOrder(order)}
-                          disabled={actionLoading === order.id}
-                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-                          title="Annulla ordine"
+                          
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Open:</span>
+                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                {formatNumber(position.openPrice)}
+                              </span>
+                            </div>
+                            {tpLevel && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">TP:</span>
+                                <span className="ml-1 font-medium text-green-600 dark:text-green-400">
+                                  {formatNumber(tpLevel)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">P&L:</span>
+                              <span className={cn("ml-1 font-bold", getPnLColor(position.pnl))}>
+                                {formatCurrency(position.pnl)}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                    
+                    {/* Orders */}
+                    {group.orders.map((order) => {
+                      const dir = normalizeDirection(order.direction)
+                      const tpLevel = order.tpLevel || order.limitLevel
+                      return (
+                        <motion.div
+                          key={order.id}
+                          className="p-4 bg-purple-50/30 dark:bg-purple-900/10"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
                         >
-                          {actionLoading === order.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <X className="w-4 h-4" />
-                          )}
-                        </button>
-                      </td>
-                    </motion.tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                {order.type}
+                              </span>
+                              {dir === 'LONG' ? (
+                                <TrendingUp className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <TrendingDown className="w-4 h-4 text-red-500" />
+                              )}
+                              <span className={cn(
+                                "font-semibold text-sm",
+                                dir === 'LONG' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                              )}>
+                                {dir} {order.contracts}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleCancelOrder(order)}
+                              disabled={actionLoading === order.id}
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                              title="Annulla ordine"
+                            >
+                              {actionLoading === order.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <X className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Entry:</span>
+                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                                {formatNumber(order.entryPrice)}
+                              </span>
+                            </div>
+                            {tpLevel && (
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">TP:</span>
+                                <span className="ml-1 font-medium text-green-600 dark:text-green-400">
+                                  {formatNumber(tpLevel)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                              <span className="ml-1 font-medium text-gray-600 dark:text-gray-300">
+                                {order.status}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

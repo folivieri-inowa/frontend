@@ -12,7 +12,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import { useAuthStore } from '@/stores/authStore'
 
 function App() {
-  const { isAuthenticated, backendConfig, logout } = useAuthStore()
+  const { isAuthenticated, backendConfig, logout, wsUrl } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeView, setActiveView] = useState('dashboard')
 
@@ -91,9 +91,10 @@ function App() {
         </main>
       </div>
 
-      {!isConnected && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg">
-          WebSocket Disconnected
+      {/* WebSocket status */}
+      {!isConnected && wsUrl && (
+        <div className="fixed bottom-4 right-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
+          ⚠️ Connessione realtime...
         </div>
       )}
     </div>
