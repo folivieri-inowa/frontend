@@ -1,27 +1,26 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Loader2, AlertCircle, ChevronDown, User } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { AVAILABLE_BACKENDS } from '@/config/backends';
 import { cn } from '@/lib/utils';
 
 export function LoginPage() {
   const { login, isLoading, error, clearError } = useAuthStore();
   
-  const [username, setUsername] = useState('');
+  const [selectedBackend, setSelectedBackend] = useState('');
   const [password, setPassword] = useState('');
-  const [apiKey, setApiKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     
-    if (!username.trim() || !password.trim() || !apiKey.trim()) {
+    if (!selectedBackend || !password.trim()) {
       return;
     }
     
-    await login(username.trim(), password, apiKey.trim());
+    await login(selectedBackend, password);
   };
 
   return (
@@ -54,7 +53,7 @@ export function LoginPage() {
           className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50 p-8"
         >
           <h2 className="text-xl font-semibold text-white mb-6">
-            Accedi con IG Markets
+            Accedi al tuo account
           </h2>
 
           {/* Error Alert */}
@@ -70,25 +69,35 @@ export function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Username */}
+            {/* Account Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Username IG
+                Seleziona Account
               </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Il tuo username IG"
-                disabled={isLoading}
-                className={cn(
-                  "w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-xl",
-                  "text-white placeholder-gray-500",
-                  "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
-                  "disabled:opacity-50 disabled:cursor-not-allowed",
-                  "transition-all duration-200"
-                )}
-              />
+              <div className="relative">
+                <select
+                  value={selectedBackend}
+                  onChange={(e) => setSelectedBackend(e.target.value)}
+                  disabled={isLoading}
+                  className={cn(
+                    "w-full px-4 py-3 pl-11 bg-gray-900/50 border border-gray-600 rounded-xl",
+                    "text-white appearance-none cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    "transition-all duration-200",
+                    !selectedBackend && "text-gray-500"
+                  )}
+                >
+                  <option value="" disabled>Seleziona il tuo account</option>
+                  {AVAILABLE_BACKENDS.map((backend) => (
+                    <option key={backend.username} value={backend.label}>
+                      {backend.label}
+                    </option>
+                  ))}
+                </select>
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+              </div>
             </div>
 
             {/* Password */}
@@ -101,7 +110,7 @@ export function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="La tua password IG"
+                  placeholder="La tua password IG Markets"
                   disabled={isLoading}
                   className={cn(
                     "w-full px-4 py-3 pr-12 bg-gray-900/50 border border-gray-600 rounded-xl",
@@ -121,40 +130,10 @@ export function LoginPage() {
               </div>
             </div>
 
-            {/* API Key */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                API Key IG
-              </label>
-              <div className="relative">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="La tua API Key IG"
-                  disabled={isLoading}
-                  className={cn(
-                    "w-full px-4 py-3 pr-12 bg-gray-900/50 border border-gray-600 rounded-xl",
-                    "text-white placeholder-gray-500",
-                    "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    "transition-all duration-200"
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading || !username || !password || !apiKey}
+              disabled={isLoading || !selectedBackend || !password}
               className={cn(
                 "w-full py-3 px-4 rounded-xl font-medium",
                 "bg-gradient-to-r from-blue-500 to-purple-600",
@@ -169,7 +148,7 @@ export function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Verifica credenziali...
+                  Verifica in corso...
                 </>
               ) : (
                 <>
@@ -182,9 +161,7 @@ export function LoginPage() {
 
           {/* Footer */}
           <p className="mt-6 text-center text-sm text-gray-500">
-            Le credenziali vengono verificate direttamente con IG Markets.
-            <br />
-            Non memorizziamo password.
+            La password viene verificata con il tuo account IG Markets.
           </p>
         </motion.div>
 

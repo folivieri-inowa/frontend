@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { BackendConfig, getBackendConfig, getApiUrl, getWsUrl } from '@/config/backends';
+import { BackendConfig, getBackendByLabel, getApiUrl, getWsUrl } from '@/config/backends';
 
 interface AuthState {
   // Stato autenticazione
@@ -17,7 +17,7 @@ interface AuthState {
   wsUrl: string;
   
   // Azioni
-  login: (username: string, password: string, apiKey: string) => Promise<boolean>;
+  login: (backendLabel: string, password: string) => Promise<boolean>;
   logout: () => void;
   clearError: () => void;
 }
@@ -33,17 +33,17 @@ export const useAuthStore = create<AuthState>()(
       apiUrl: '',
       wsUrl: '',
 
-      login: async (username: string, password: string, apiKey: string) => {
+      login: async (backendLabel: string, password: string) => {
         set({ isLoading: true, error: null });
 
         try {
-          // 1. Trova il backend per questo username
-          const config = getBackendConfig(username);
+          // 1. Trova il backend dalla label selezionata
+          const config = getBackendByLabel(backendLabel);
           
           if (!config) {
             set({ 
               isLoading: false, 
-              error: `Username "${username}" non autorizzato. Contatta l'amministratore.` 
+              error: `Backend "${backendLabel}" non trovato.` 
             });
             return false;
           }
@@ -52,13 +52,16 @@ export const useAuthStore = create<AuthState>()(
           const apiUrl = getApiUrl(config);
           const wsUrl = getWsUrl(config);
 
-          // 3. Verifica credenziali con il backend
+          // 3. Verifica credenziali con il backend (senza API key)
           const response = await fetch(`${apiUrl}/api/auth/verify`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username, password, apiKey }),
+            body: JSON.stringify({ 
+              username: config.username, 
+              password 
+            }),
           });
 
           const data = await response.json();
@@ -66,7 +69,7 @@ export const useAuthStore = create<AuthState>()(
           if (!response.ok || !data.success) {
             set({ 
               isLoading: false, 
-              error: data.error || 'Credenziali IG non valide' 
+              error: data.error || 'Password non valida' 
             });
             return false;
           }
@@ -76,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
             error: null,
-            igUsername: username,
+            igUsername: config.username,
             backendConfig: config,
             apiUrl,
             wsUrl,

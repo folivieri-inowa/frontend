@@ -14,35 +14,38 @@ export interface BackendConfig {
 // Modalità sviluppo locale: punta direttamente al backend
 const isDev = import.meta.env.DEV;
 
-// Mappatura username IG -> backend
-// In DEV: usa URL completi diretti ai backend
-// In PROD: usa path che l'Ingress ruterà
-export const BACKEND_CONFIGS: Record<string, BackendConfig> = {
-  'boban_16': {
+// Lista backend disponibili per la dropdown
+export const AVAILABLE_BACKENDS: BackendConfig[] = [
+  {
     username: 'boban_16',
     label: 'Francesco',
     apiPath: isDev ? 'http://localhost:3001' : '/api/francesco',
     wsPath: isDev ? 'ws://localhost:3002' : '/ws/francesco',
   },
-  'fiordok': {
+  {
     username: 'fiordok',
     label: 'Marco',
     apiPath: isDev ? 'http://localhost:3001' : '/api/marco',
     wsPath: isDev ? 'ws://localhost:3002' : '/ws/marco',
   },
-  'dmatera79': {
+  {
     username: 'dmatera79',
     label: 'Daniele',
     apiPath: isDev ? 'http://localhost:3001' : '/api/daniele',
     wsPath: isDev ? 'ws://localhost:3002' : '/ws/daniele',
   },
-  'Pinturicchio25': {
+  {
     username: 'Pinturicchio25',
     label: 'Davide',
     apiPath: isDev ? 'http://localhost:3001' : '/api/davide',
     wsPath: isDev ? 'ws://localhost:3002' : '/ws/davide',
   },
-};
+];
+
+// Mappatura username IG -> backend (per compatibilità)
+export const BACKEND_CONFIGS: Record<string, BackendConfig> = Object.fromEntries(
+  AVAILABLE_BACKENDS.map(b => [b.username, b])
+);
 
 // Username lowercase per matching case-insensitive
 export const BACKEND_CONFIGS_LOWERCASE: Record<string, BackendConfig> = 
@@ -60,6 +63,13 @@ export function getBackendConfig(igUsername: string): BackendConfig | null {
   }
   // Poi prova case-insensitive
   return BACKEND_CONFIGS_LOWERCASE[igUsername.toLowerCase()] || null;
+}
+
+/**
+ * Trova la configurazione backend per label
+ */
+export function getBackendByLabel(label: string): BackendConfig | null {
+  return AVAILABLE_BACKENDS.find(b => b.label === label) || null;
 }
 
 /**

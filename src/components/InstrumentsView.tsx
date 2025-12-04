@@ -32,6 +32,7 @@ interface StartParams {
   contracts: number
   tpPoints: number
   direction: 'LONG' | 'SHORT'
+  orderDistanceDivisor: number
 }
 
 export function InstrumentsView() {
@@ -50,7 +51,8 @@ export function InstrumentsView() {
   const [startParams, setStartParams] = useState<StartParams>({
     contracts: 1,
     tpPoints: 90,
-    direction: 'LONG'
+    direction: 'LONG',
+    orderDistanceDivisor: 3
   })
   const [configParams, setConfigParams] = useState({
     harvestPercentage: 67,
@@ -100,12 +102,8 @@ export function InstrumentsView() {
   useEffect(() => {
     fetchInstruments()
     fetchPausedEpics()
-    // Refresh ogni 30 secondi
-    const interval = setInterval(() => {
-      fetchInstruments()
-      fetchPausedEpics()
-    }, 30000)
-    return () => clearInterval(interval)
+    // No polling - gli strumenti non cambiano frequentemente
+    // Usare il tasto Aggiorna per refresh manuale
   }, [])
 
   // Open start modal
@@ -114,7 +112,8 @@ export function InstrumentsView() {
     setStartParams({
       contracts: instrument.defaultContracts,
       tpPoints: instrument.defaultTPPoints,
-      direction: 'LONG'
+      direction: 'LONG',
+      orderDistanceDivisor: 3  // Default
     })
     setShowStartModal(true)
   }
@@ -548,6 +547,30 @@ export function InstrumentsView() {
                       SHORT
                     </button>
                   </div>
+                </div>
+
+                {/* Order Distance Divisor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Distanza Ordine Opposto
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={startParams.orderDistanceDivisor}
+                      onChange={(e) => setStartParams({ ...startParams, orderDistanceDivisor: parseInt(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <span className="w-24 text-right font-medium text-gray-900 dark:text-white">
+                      TP / {startParams.orderDistanceDivisor}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Ordine opposto a {(startParams.tpPoints / startParams.orderDistanceDivisor).toFixed(1)} punti dalla posizione
+                  </p>
                 </div>
               </div>
 

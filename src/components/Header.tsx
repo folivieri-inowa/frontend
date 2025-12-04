@@ -2,7 +2,9 @@ import { motion } from 'framer-motion'
 import { Menu, Moon, Sun, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { NotificationCenter } from '@/components/NotificationCenter'
 import { useState, useEffect } from 'react'
+import type { Notification } from '@/types/trading.types'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -14,9 +16,24 @@ interface HeaderProps {
   }
   userLabel?: string
   onLogout?: () => void
+  notifications?: Notification[]
+  onMarkNotificationAsRead?: (id: string) => void
+  onMarkAllNotificationsAsRead?: () => void
+  onClearNotification?: (id: string) => void
+  onClearAllNotifications?: () => void
 }
 
-export function Header({ onToggleSidebar, systemStatus, userLabel, onLogout }: HeaderProps) {
+export function Header({ 
+  onToggleSidebar, 
+  systemStatus, 
+  userLabel, 
+  onLogout,
+  notifications = [],
+  onMarkNotificationAsRead = () => {},
+  onMarkAllNotificationsAsRead = () => {},
+  onClearNotification = () => {},
+  onClearAllNotifications = () => {},
+}: HeaderProps) {
   const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
@@ -92,6 +109,15 @@ export function Header({ onToggleSidebar, systemStatus, userLabel, onLogout }: H
             </span>
           </div>
         )}
+
+        {/* Notifications */}
+        <NotificationCenter
+          notifications={notifications}
+          onMarkAsRead={onMarkNotificationAsRead}
+          onMarkAllAsRead={onMarkAllNotificationsAsRead}
+          onClear={onClearNotification}
+          onClearAll={onClearAllNotifications}
+        />
         
         <Button variant="ghost" size="sm" onClick={toggleTheme}>
           {isDark ? (

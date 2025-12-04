@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   TrendingUp, 
   TrendingDown, 
   RefreshCw, 
   X,
-  AlertCircle,
   Loader2,
   Target,
   DollarSign,
@@ -13,38 +12,7 @@ import {
 } from 'lucide-react'
 import { cn, formatCurrency, formatNumber, getPnLColor } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-
-interface Position {
-  id: string
-  epic: string
-  instrument: string
-  direction: 'BUY' | 'SELL' | 'LONG' | 'SHORT'
-  contracts: number
-  openPrice: number
-  currentPrice?: number
-  pnl: number
-  tpLevel?: number
-  limitLevel?: number
-  stopLevel?: number
-  phase?: string
-  openedAt?: string
-  createdAt?: string
-}
-
-interface Order {
-  id: string
-  epic: string
-  instrument: string
-  direction: 'BUY' | 'SELL' | 'LONG' | 'SHORT'
-  contracts: number
-  entryPrice: number
-  type: 'LIMIT' | 'STOP'
-  limitLevel?: number
-  tpLevel?: number
-  stopLevel?: number
-  createdAt?: string
-  status: string
-}
+import type { Position, Order } from '@/types/trading.types'
 
 interface GroupedData {
   epic: string
@@ -53,54 +21,27 @@ interface GroupedData {
   orders: Order[]
 }
 
-export function PositionsView() {
+interface PositionsViewProps {
+  positions: Position[]
+  orders: Order[]
+  onRefreshPositions: () => Promise<boolean>
+  onRefreshOrders: () => Promise<boolean>
+}
+
+export function PositionsView({ positions, orders, onRefreshPositions, onRefreshOrders }: PositionsViewProps) {
   const { apiUrl } = useAuthStore()
-  const [positions, setPositions] = useState<Position[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Fetch data
-  const fetchData = async () => {
-    if (!apiUrl) return
-    try {
-      setLoading(true)
-      
-      // Fetch positions and orders in parallel
-      const [posRes, ordRes] = await Promise.all([
-        fetch(`${apiUrl}/api/positions`),
-        fetch(`${apiUrl}/api/orders`)
-      ])
-      
-      const posData = await posRes.json()
-      const ordData = await ordRes.json()
-      
-      if (posData.success) {
-        setPositions(posData.data || [])
-      }
-      if (ordData.success) {
-        setOrders(ordData.data || [])
-      }
-      
-      setError(null)
-    } catch (err) {
-      setError('Impossibile connettersi al backend')
-      console.error('Fetch error:', err)
-    } finally {
-      setLoading(false)
-    }
+  // Manual refresh
+  const handleRefresh = async () => {
+    setLoading(true)
+    await Promise.all([onRefreshPositions(), onRefreshOrders()])
+    setLoading(false)
   }
 
-  useEffect(() => {
-    fetchData()
-    // Refresh ogni 10 secondi
-    const interval = setInterval(fetchData, 10000)
-    return () => clearInterval(interval)
-  }, [])
-
   // Close position
-  const handleClosePosition = async (position: Position) => {
+  const handleClosePosition = async (position: { id: string; instrument?: string }) => {
     if (!confirm(`Chiudere la posizione ${position.instrument}?`)) return
     
     try {
@@ -112,7 +53,8 @@ export function PositionsView() {
       const data = await response.json()
       
       if (data.success) {
-        fetchData()
+        // Refresh via WebSocket callback
+        onRefreshPositions()
       } else {
         alert(`Errore: ${data.error}`)
       }
@@ -125,7 +67,7 @@ export function PositionsView() {
   }
 
   // Cancel order
-  const handleCancelOrder = async (order: Order) => {
+  const handleCancelOrder = async (order: { id: string; instrument?: string }) => {
     if (!confirm(`Annullare l'ordine ${order.instrument}?`)) return
     
     try {
@@ -137,7 +79,8 @@ export function PositionsView() {
       const data = await response.json()
       
       if (data.success) {
-        fetchData()
+        // Refresh via WebSocket callback
+        onRefreshOrders()
       } else {
         alert(`Errore: ${data.error}`)
       }
@@ -193,15 +136,6 @@ export function PositionsView() {
   const totalPnL = positions.reduce((sum, p) => sum + (p.pnl || 0), 0)
   const totalContracts = positions.reduce((sum, p) => sum + p.contracts, 0)
 
-  if (loading && positions.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Caricamento posizioni...</span>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,10 +144,11 @@ export function PositionsView() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Posizioni & Ordini</h2>
           <p className="text-gray-600 dark:text-gray-400">
             {positions.length} posizioni aperte • {orders.length} ordini pendenti
+            <span className="ml-2 text-xs text-green-500">● Live</span>
           </p>
         </div>
         <button
-          onClick={fetchData}
+          onClick={handleRefresh}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
         >
@@ -268,14 +203,6 @@ export function PositionsView() {
           </div>
         </div>
       </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
-          <AlertCircle className="w-5 h-5" />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* Grouped by Epic */}
       <div className="space-y-4">
@@ -368,8 +295,8 @@ export function PositionsView() {
                             )}
                             <div>
                               <span className="text-gray-500 dark:text-gray-400">P&L:</span>
-                              <span className={cn("ml-1 font-bold", getPnLColor(position.pnl))}>
-                                {formatCurrency(position.pnl)}
+                              <span className={cn("ml-1 font-bold", getPnLColor(position.pnl || 0))}>
+                                {formatCurrency(position.pnl || 0)}
                               </span>
                             </div>
                           </div>

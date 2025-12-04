@@ -7,6 +7,7 @@ import { StatisticsView } from '@/components/StatisticsView'
 import { SettingsView } from '@/components/SettingsView'
 import { InstrumentsView } from '@/components/InstrumentsView'
 import { PositionsView } from '@/components/PositionsView'
+import { DatabaseView } from '@/components/DatabaseView'
 import { LoginPage } from '@/components/LoginPage'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useAuthStore } from '@/stores/authStore'
@@ -28,19 +29,14 @@ function App() {
     positions, 
     orders,
     consoleLogs,
+    notifications,
     refreshPositions,
-    refreshOrders
+    refreshOrders,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
+    clearAllNotifications,
   } = useWebSocket()
-
-  const mockStatistics = {
-    totalTrades: 0,
-    winRate: 0,
-    totalProfit: 0,
-    maxDrawdown: 0,
-    avgTradeDuration: '0h 0m',
-    todayTrades: 0,
-    todayProfit: 0
-  }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col">
@@ -53,6 +49,11 @@ function App() {
         }}
         userLabel={backendConfig?.label}
         onLogout={logout}
+        notifications={notifications}
+        onMarkNotificationAsRead={markNotificationAsRead}
+        onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
+        onClearNotification={clearNotification}
+        onClearAllNotifications={clearAllNotifications}
       />
       
       <div className="flex flex-1 overflow-hidden">
@@ -77,10 +78,18 @@ function App() {
             <InstrumentsView />
           )}
           {activeView === 'positions' && (
-            <PositionsView />
+            <PositionsView 
+              positions={positions}
+              orders={orders}
+              onRefreshPositions={refreshPositions}
+              onRefreshOrders={refreshOrders}
+            />
           )}
           {activeView === 'statistics' && (
-            <StatisticsView statistics={mockStatistics} />
+            <StatisticsView />
+          )}
+          {activeView === 'database' && (
+            <DatabaseView />
           )}
           {activeView === 'console' && (
             <ConsoleView logs={consoleLogs} />

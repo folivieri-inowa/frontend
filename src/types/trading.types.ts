@@ -8,6 +8,8 @@ export interface Position {
   currentPrice?: number
   pnl?: number
   tpLevel?: number
+  limitLevel?: number
+  stopLevel?: number
   phase: string
   openedAt: Date
 }
@@ -21,6 +23,8 @@ export interface Order {
   contracts: number
   entryPrice: number
   tpLevel?: number
+  limitLevel?: number
+  stopLevel?: number
   status: 'PENDING' | 'FILLED' | 'CANCELLED'
   createdAt: Date
 }
@@ -71,6 +75,34 @@ export interface StrategyConfig {
   maxContracts: number
 }
 
+// 🔔 Sistema Notifiche
+export type NotificationType = 
+  | 'tp_reached'      // Take Profit raggiunto
+  | 'order_executed'  // Ordine eseguito
+  | 'position_opened' // Posizione aperta
+  | 'position_closed' // Posizione chiusa
+  | 'cycle_complete'  // Ciclo completato
+  | 'instrument_started' // Strumento avviato
+  | 'instrument_stopped' // Strumento fermato
+  | 'error'           // Errore
+  | 'warning'         // Avviso
+  | 'info'            // Informazione
+
+export type NotificationLevel = 'success' | 'info' | 'warning' | 'error'
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  level: NotificationLevel
+  title: string
+  message: string
+  epic?: string
+  instrument?: string
+  data?: Record<string, any>
+  timestamp: Date
+  read: boolean
+}
+
 export type WebSocketEvent =
   | { type: 'CONNECTED'; data: { message: string; timestamp: Date } }
   | { type: 'SYSTEM_STATUS'; data: SystemStatus }
@@ -79,3 +111,4 @@ export type WebSocketEvent =
   | { type: 'ORDER_UPDATE'; data: Order }
   | { type: 'TRADE_CONFIRM'; data: any }
   | { type: 'CONSOLE_LOG'; data: ConsoleLog }
+  | { type: 'NOTIFICATION'; data: Notification }

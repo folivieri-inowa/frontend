@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import type { WebSocketEvent, SystemStatus, AccountInfo, Position, Order, ConsoleLog } from '@/types/trading.types'
+import type { WebSocketEvent, SystemStatus, AccountInfo, Position, Order, ConsoleLog, Notification } from '@/types/trading.types'
 import { useAuthStore } from '@/stores/authStore'
 
 export function useWebSocket() {
@@ -21,6 +21,7 @@ export function useWebSocket() {
   const [positions, setPositions] = useState<Position[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
 
   // Fetch initial data on mount (solo se autenticato)
   useEffect(() => {
@@ -184,6 +185,14 @@ export function useWebSocket() {
           return newLogs.slice(0, 500)
         })
         break
+      
+      case 'NOTIFICATION':
+        console.log('🔔 Notification received:', message.data)
+        setNotifications((prev) => {
+          // Add to front, keep max 50 notifications
+          return [message.data, ...prev].slice(0, 50)
+        })
+        break
     }
   }, [])
 
@@ -235,6 +244,25 @@ export function useWebSocket() {
     }
   }, [apiUrl])
 
+  // 🔔 Notification handlers
+  const markNotificationAsRead = useCallback((id: string) => {
+    setNotifications((prev) => 
+      prev.map((n) => n.id === id ? { ...n, read: true } : n)
+    )
+  }, [])
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  }, [])
+
+  const clearNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+  }, [])
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([])
+  }, [])
+
   return {
     isConnected,
     systemStatus,
@@ -242,8 +270,13 @@ export function useWebSocket() {
     positions,
     orders,
     consoleLogs,
+    notifications,
     sendMessage,
     refreshPositions,
     refreshOrders,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotification,
+    clearAllNotifications,
   }
 }
