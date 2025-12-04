@@ -1,9 +1,9 @@
-import { motion } from 'framer-motion'
-import { Menu, Moon, Sun, User, LogOut } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Menu, Moon, Sun, User, LogOut, MoreVertical, Wifi, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { NotificationCenter } from '@/components/NotificationCenter'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Notification } from '@/types/trading.types'
 
 interface HeaderProps {
@@ -35,6 +35,8 @@ export function Header({
   onClearAllNotifications = () => {},
 }: HeaderProps) {
   const [isDark, setIsDark] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const theme = localStorage.getItem('theme')
@@ -42,6 +44,17 @@ export function Header({
     if (theme === 'dark') {
       document.documentElement.classList.add('dark')
     }
+  }, [])
+
+  // Chiudi menu mobile quando si clicca fuori
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   const toggleTheme = () => {
@@ -75,27 +88,31 @@ export function Header({
 
   return (
     <motion.header
-      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between"
+      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         <Button variant="ghost" size="sm" onClick={onToggleSidebar}>
           <Menu className="w-5 h-5" />
         </Button>
         
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Genesis Trading
+        <div className="flex items-center gap-2 md:gap-3">
+          <h1 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+            <span className="hidden sm:inline">Genesis Trading</span>
+            <span className="sm:hidden">Genesis</span>
           </h1>
-          <Badge variant={getStatusVariant()}>
-            {getStatusText()}{formatSessionAge(systemStatus.sessionAge)}
+          {/* Badge status sempre visibile */}
+          <Badge variant={getStatusVariant()} className="text-xs">
+            {getStatusText()}
+            <span className="hidden md:inline">{formatSessionAge(systemStatus.sessionAge)}</span>
           </Badge>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Desktop: tutti i controlli visibili */}
+      <div className="hidden md:flex items-center gap-4">
         <div className="text-sm text-gray-600 dark:text-gray-400">
           Stream: <span className="font-medium">{systemStatus.streamStatus}</span>
         </div>
@@ -138,6 +155,93 @@ export function Header({
             <LogOut className="w-5 h-5" />
           </Button>
         )}
+      </div>
+
+      {/* Mobile: controlli essenziali + menu dropdown */}
+      <div className="flex md:hidden items-center gap-2">
+        {/* Notifications sempre visibili */}
+        <NotificationCenter
+          notifications={notifications}
+          onMarkAsRead={onMarkNotificationAsRead}
+          onMarkAllAsRead={onMarkAllNotificationsAsRead}
+          onClear={onClearNotification}
+          onClearAll={onClearAllNotifications}
+        />
+
+        {/* Menu dropdown mobile */}
+        <div className="relative" ref={menuRef}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            <MoreVertical className="w-5 h-5" />
+          </Button>
+
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50"
+              >
+                {/* Stream status */}
+                <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Wifi className="w-4 h-4" />
+                    <span>Stream: <span className="font-medium">{systemStatus.streamStatus}</span></span>
+                  </div>
+                </div>
+
+                {/* Session age */}
+                {systemStatus.sessionAge && (
+                  <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Activity className="w-4 h-4" />
+                      <span>Sessione: {formatSessionAge(systemStatus.sessionAge).trim()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* User */}
+                {userLabel && (
+                  <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <User className="w-4 h-4 text-gray-500" />
+                      <span className="font-medium">{userLabel}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Theme toggle */}
+                <button
+                  onClick={() => { toggleTheme(); setMobileMenuOpen(false) }}
+                  className="w-full px-4 py-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {isDark ? (
+                    <Sun className="w-4 h-4 text-yellow-500" />
+                  ) : (
+                    <Moon className="w-4 h-4" />
+                  )}
+                  <span>{isDark ? 'Tema chiaro' : 'Tema scuro'}</span>
+                </button>
+
+                {/* Logout */}
+                {onLogout && (
+                  <button
+                    onClick={() => { onLogout(); setMobileMenuOpen(false) }}
+                    className="w-full px-4 py-2 flex items-center gap-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </motion.header>
   )

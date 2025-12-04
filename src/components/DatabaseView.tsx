@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { cn, formatNumber } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { 
   Database,
@@ -222,14 +222,14 @@ export function DatabaseView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Database className="w-8 h-8 text-blue-500" />
+          <Database className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white">
               Database Explorer
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
               Visualizza e verifica la sincronizzazione del database
             </p>
           </div>
@@ -252,57 +252,57 @@ export function DatabaseView() {
             ? "border-green-200 dark:border-green-800" 
             : "border-red-200 dark:border-red-800"
         )}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 {syncStatus.synced ? (
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                    <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
                   </div>
                 ) : (
-                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                  <div className="p-2 sm:p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 dark:text-red-400" />
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    {syncStatus.synced ? '✅ Database Sincronizzato' : '⚠️ Sincronizzazione Necessaria'}
+                  <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">
+                    {syncStatus.synced ? '✅ DB Sincronizzato' : '⚠️ Sync Necessaria'}
                   </h3>
-                  <p className="text-sm text-gray-500">
-                    Ultimo controllo: {new Date(syncStatus.lastCheck).toLocaleTimeString('it-IT')}
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Ultimo: {new Date(syncStatus.lastCheck).toLocaleTimeString('it-IT')}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
                 {/* Posizioni */}
                 <div className="text-center">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <span className={cn(
-                      "text-2xl font-bold",
+                      "text-lg sm:text-2xl font-bold",
                       syncStatus.positions.synced ? "text-green-600" : "text-red-600"
                     )}>
                       {syncStatus.positions.db}
                     </span>
                     <span className="text-gray-400">/</span>
-                    <span className="text-lg text-gray-500">{syncStatus.positions.ig}</span>
+                    <span className="text-sm sm:text-lg text-gray-500">{syncStatus.positions.ig}</span>
                   </div>
-                  <p className="text-xs text-gray-500">Posizioni DB/IG</p>
+                  <p className="text-xs text-gray-500">Posizioni</p>
                 </div>
 
                 {/* Ordini */}
                 <div className="text-center">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <span className={cn(
-                      "text-2xl font-bold",
+                      "text-lg sm:text-2xl font-bold",
                       syncStatus.orders.synced ? "text-green-600" : "text-red-600"
                     )}>
                       {syncStatus.orders.db}
                     </span>
                     <span className="text-gray-400">/</span>
-                    <span className="text-lg text-gray-500">{syncStatus.orders.ig}</span>
+                    <span className="text-sm sm:text-lg text-gray-500">{syncStatus.orders.ig}</span>
                   </div>
-                  <p className="text-xs text-gray-500">Ordini DB/IG</p>
+                  <p className="text-xs text-gray-500">Ordini</p>
                 </div>
 
                 {/* Bottone Forza Sync */}
@@ -310,14 +310,17 @@ export function DatabaseView() {
                   <Button 
                     onClick={forceSync}
                     disabled={syncing}
+                    size="sm"
                     className="bg-red-500 hover:bg-red-600"
                   >
                     {syncing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Zap className="w-4 h-4 mr-2" />
+                      <>
+                        <Zap className="w-4 h-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Forza Sync</span>
+                      </>
                     )}
-                    Forza Sync
                   </Button>
                 )}
               </div>
@@ -326,7 +329,7 @@ export function DatabaseView() {
             {/* Dettagli mismatch */}
             {!syncStatus.synced && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   {syncStatus.positions.missing.length > 0 && (
                     <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
                       <p className="font-medium text-yellow-800 dark:text-yellow-200">
@@ -354,10 +357,10 @@ export function DatabaseView() {
         </Card>
       )}
 
-      {/* Layout a due colonne: Lista tabelle + Contenuto */}
-      <div className="grid grid-cols-12 gap-6">
+      {/* Layout a due colonne su desktop, stack su mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
         {/* Lista Tabelle */}
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -388,14 +391,14 @@ export function DatabaseView() {
                           <p className="font-medium text-gray-900 dark:text-white">
                             {table.name}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
                             {table.description}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="default">
-                          {formatNumber(table.count)}
+                          {Math.floor(table.count)}
                         </Badge>
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                       </div>
@@ -408,7 +411,7 @@ export function DatabaseView() {
         </div>
 
         {/* Contenuto Tabella */}
-        <div className="col-span-8">
+        <div className="lg:col-span-8">
           <AnimatePresence mode="wait">
             {selectedTable ? (
               <motion.div

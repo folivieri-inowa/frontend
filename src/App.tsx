@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/Header'
 import { Sidebar } from '@/components/Sidebar'
 import { Dashboard } from '@/components/Dashboard'
@@ -11,10 +11,30 @@ import { LoginPage } from '@/components/LoginPage'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useAuthStore } from '@/stores/authStore'
 
+// Custom hook per rilevare viewport mobile
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint)
+  
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < breakpoint)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [breakpoint])
+  
+  return isMobile
+}
+
 function App() {
   const { isAuthenticated, backendConfig, logout, wsUrl } = useAuthStore()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const isMobile = useIsMobile()
+  // Sidebar chiusa di default su mobile, aperta su desktop
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
   const [activeView, setActiveView] = useState('dashboard')
+  
+  // Chiudi sidebar quando si passa a mobile
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false)
+  }, [isMobile])
 
   // Se non autenticato, mostra login
   if (!isAuthenticated) {

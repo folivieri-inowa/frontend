@@ -24,6 +24,7 @@ interface InstrumentConfig {
   harvestPercentage: number
   defaultContracts: number
   defaultTPPoints: number
+  orderDistanceDivisor: number
   isActive: boolean
   hasConfig: boolean
 }
@@ -33,6 +34,7 @@ interface StartParams {
   tpPoints: number
   direction: 'LONG' | 'SHORT'
   orderDistanceDivisor: number
+  harvestPercentage: number
 }
 
 export function InstrumentsView() {
@@ -52,12 +54,14 @@ export function InstrumentsView() {
     contracts: 1,
     tpPoints: 90,
     direction: 'LONG',
-    orderDistanceDivisor: 3
+    orderDistanceDivisor: 3,
+    harvestPercentage: 67
   })
   const [configParams, setConfigParams] = useState({
     harvestPercentage: 67,
     defaultContracts: 1,
-    defaultTPPoints: 90
+    defaultTPPoints: 90,
+    orderDistanceDivisor: 3
   })
   
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -113,7 +117,8 @@ export function InstrumentsView() {
       contracts: instrument.defaultContracts,
       tpPoints: instrument.defaultTPPoints,
       direction: 'LONG',
-      orderDistanceDivisor: 3  // Default
+      orderDistanceDivisor: instrument.orderDistanceDivisor || 3,
+      harvestPercentage: instrument.harvestPercentage
     })
     setShowStartModal(true)
   }
@@ -124,7 +129,8 @@ export function InstrumentsView() {
     setConfigParams({
       harvestPercentage: instrument.harvestPercentage,
       defaultContracts: instrument.defaultContracts,
-      defaultTPPoints: instrument.defaultTPPoints
+      defaultTPPoints: instrument.defaultTPPoints,
+      orderDistanceDivisor: instrument.orderDistanceDivisor || 3
     })
     setShowConfigModal(true)
   }
@@ -393,6 +399,10 @@ export function InstrumentsView() {
                       <span>TP Points:</span>
                       <span className="font-medium">{instrument.defaultTPPoints}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span>Dist. Ordine:</span>
+                      <span className="font-medium">TP / {instrument.orderDistanceDivisor || 3}</span>
+                    </div>
                   </div>
 
                   {/* Actions */}
@@ -572,6 +582,29 @@ export function InstrumentsView() {
                     Ordine opposto a {(startParams.tpPoints / startParams.orderDistanceDivisor).toFixed(1)} punti dalla posizione
                   </p>
                 </div>
+
+                {/* Harvest Percentage */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Percentuale Falciatura
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={startParams.harvestPercentage}
+                      onChange={(e) => setStartParams({ ...startParams, harvestPercentage: parseInt(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-right font-medium text-gray-900 dark:text-white">
+                      {startParams.harvestPercentage}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Percentuale del profitto da falciare automaticamente
+                  </p>
+                </div>
               </div>
 
               {/* Actions */}
@@ -674,6 +707,30 @@ export function InstrumentsView() {
                     onChange={(e) => setConfigParams({ ...configParams, defaultTPPoints: parseFloat(e.target.value) || 10 })}
                     className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* Order Distance Divisor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Distanza Ordine Opposto
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={configParams.orderDistanceDivisor}
+                      onChange={(e) => setConfigParams({ ...configParams, orderDistanceDivisor: parseInt(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <span className="w-24 text-right font-medium text-gray-900 dark:text-white">
+                      TP / {configParams.orderDistanceDivisor}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Ordine opposto a TP/{configParams.orderDistanceDivisor} punti dalla posizione
+                  </p>
                 </div>
               </div>
 
