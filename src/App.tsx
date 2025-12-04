@@ -4,7 +4,6 @@ import { Sidebar } from '@/components/Sidebar'
 import { Dashboard } from '@/components/Dashboard'
 import { ConsoleView } from '@/components/ConsoleView'
 import { StatisticsView } from '@/components/StatisticsView'
-import { SettingsView } from '@/components/SettingsView'
 import { InstrumentsView } from '@/components/InstrumentsView'
 import { PositionsView } from '@/components/PositionsView'
 import { DatabaseView } from '@/components/DatabaseView'
@@ -93,9 +92,6 @@ function App() {
           )}
           {activeView === 'console' && (
             <ConsoleView logs={consoleLogs} />
-          )}
-          {activeView === 'settings' && (
-            <SettingsView />
           )}
         </main>
       </div>

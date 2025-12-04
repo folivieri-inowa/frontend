@@ -6,8 +6,7 @@ import {
   ChevronRight,
   Boxes,
   BarChart3,
-  Database,
-  Settings
+  Database
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +23,6 @@ const menuItems = [
   { id: 'positions', label: 'Posizioni', icon: TrendingUp },
   { id: 'statistics', label: 'Statistiche', icon: BarChart3 },
   { id: 'database', label: 'Database', icon: Database },
-  { id: 'settings', label: 'Impostazioni', icon: Settings },
 ]
 
 export function Sidebar({ isOpen, onToggle, activeView, onViewChange }: SidebarProps) {

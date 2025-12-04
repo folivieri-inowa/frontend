@@ -31,7 +31,7 @@ export function useWebSocket() {
       try {
         console.log('🔄 Fetching initial data from', apiUrl)
         
-        // Fetch account info only (positions/orders on manual refresh)
+        // Fetch account info
         const accountRes = await fetch(`${apiUrl}/api/account`)
         if (accountRes.ok) {
           const { success, data } = await accountRes.json()
@@ -39,11 +39,31 @@ export function useWebSocket() {
             setAccountInfo({
               balance: data.available || 0,
               equity: data.balance || 0,
-              margin: data.deposit || 0,
+              margin: data.margin || 0,
               available: data.available || 0,
-              pnl: data.profitLoss || 0
+              pnl: data.pnl || 0
             })
             console.log('✅ Loaded account info')
+          }
+        }
+        
+        // Fetch positions
+        const positionsRes = await fetch(`${apiUrl}/api/positions`)
+        if (positionsRes.ok) {
+          const positionsData = await positionsRes.json()
+          if (Array.isArray(positionsData) && positionsData.length > 0) {
+            setPositions(positionsData)
+            console.log(`✅ Loaded ${positionsData.length} positions`)
+          }
+        }
+        
+        // Fetch orders
+        const ordersRes = await fetch(`${apiUrl}/api/orders`)
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json()
+          if (Array.isArray(ordersData) && ordersData.length > 0) {
+            setOrders(ordersData)
+            console.log(`✅ Loaded ${ordersData.length} orders`)
           }
         }
       } catch (error) {
@@ -191,6 +211,35 @@ export function useWebSocket() {
         setNotifications((prev) => {
           // Add to front, keep max 50 notifications
           return [message.data, ...prev].slice(0, 50)
+        })
+        break
+      
+      case 'MARKET_PRICE_UPDATE':
+        // Aggiorna i prezzi delle posizioni in tempo reale
+        setPositions((prev) => {
+          const epic = message.data.epic
+          const bid = message.data.bid
+          const offer = message.data.offer
+          
+          let updated = false
+          const newPositions = prev.map((pos) => {
+            if (pos.epic === epic) {
+              // Per LONG usiamo bid (prezzo di vendita), per SHORT usiamo offer (prezzo di acquisto)
+              const currentPrice = pos.direction === 'LONG' ? bid : offer
+              if (currentPrice && pos.openPrice) {
+                // Calcola P&L
+                const pnl = pos.direction === 'LONG'
+                  ? (currentPrice - pos.openPrice) * pos.contracts
+                  : (pos.openPrice - currentPrice) * pos.contracts
+                
+                updated = true
+                return { ...pos, currentPrice, pnl }
+              }
+            }
+            return pos
+          })
+          
+          return updated ? newPositions : prev
         })
         break
     }

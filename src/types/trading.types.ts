@@ -112,3 +112,4 @@ export type WebSocketEvent =
   | { type: 'TRADE_CONFIRM'; data: any }
   | { type: 'CONSOLE_LOG'; data: ConsoleLog }
   | { type: 'NOTIFICATION'; data: Notification }
+  | { type: 'MARKET_PRICE_UPDATE'; data: { epic: string; bid: number; offer: number; high?: number; low?: number; netChange?: number; netChangePct?: number; updateTime?: string } }
