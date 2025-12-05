@@ -8,11 +8,22 @@ import {
   Loader2,
   Target,
   DollarSign,
-  Package
+  Package,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react'
 import { cn, formatCurrency, formatNumber, getPnLColor } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Position, Order } from '@/types/trading.types'
+
+interface RecoveryProposal {
+  id: string;
+  epic: string;
+  proposedAction: string;
+  description: string;
+  impact: string;
+  status: string;
+}
 
 interface GroupedData {
   epic: string
@@ -32,12 +43,122 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
   const { apiUrl } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [checkingEpic, setCheckingEpic] = useState<string | null>(null)
+  const [pendingProposal, setPendingProposal] = useState<RecoveryProposal | null>(null)
 
   // Manual refresh
   const handleRefresh = async () => {
     setLoading(true)
     await Promise.all([onRefreshPositions(), onRefreshOrders()])
     setLoading(false)
+  }
+
+  // 🛡️ Recovery Check per singolo epic
+  const handleRecoveryCheck = async (epic: string, instrument: string) => {
+    try {
+      setCheckingEpic(epic)
+      
+      const response = await fetch(`${apiUrl}/api/recovery/check/${encodeURIComponent(epic)}`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        if (data.data.healthy) {
+          // Stato sano
+          alert(`✅ ${instrument}\n\nStato verificato: SANO\n\n${data.data.message}`)
+        } else if (data.data.proposal) {
+          // C'è una proposta - mostra dialog
+          setPendingProposal(data.data.proposal)
+        } else {
+          alert(`⚠️ ${instrument}\n\nAnomalia rilevata: ${data.data.message}`)
+        }
+      } else {
+        alert(`❌ Errore: ${data.error}`)
+      }
+    } catch (err) {
+      alert('Errore nella comunicazione con il backend')
+      console.error('Recovery check error:', err)
+    } finally {
+      setCheckingEpic(null)
+    }
+  }
+
+  // 🛡️ Check globale
+  const handleGlobalCheck = async () => {
+    if (!confirm('Eseguire check di tutti gli strumenti attivi?\n\nQuesto controllerà lo stato di tutte le posizioni e ordini.')) return
+    
+    try {
+      setLoading(true)
+      
+      const response = await fetch(`${apiUrl}/api/recovery/check-all`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        const { total, healthy, unhealthy } = data.data
+        if (unhealthy === 0) {
+          alert(`✅ Check Globale Completato\n\n${total} strumenti controllati\n✅ Tutti sani!`)
+        } else {
+          alert(`⚠️ Check Globale Completato\n\n${total} strumenti controllati\n✅ ${healthy} sani\n⚠️ ${unhealthy} con anomalie\n\nControlla le notifiche per i dettagli.`)
+        }
+      } else {
+        alert(`❌ Errore: ${data.error}`)
+      }
+    } catch (err) {
+      alert('Errore nella comunicazione con il backend')
+      console.error('Global check error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ✅ Conferma proposta
+  const handleConfirmProposal = async () => {
+    if (!pendingProposal) return
+    
+    try {
+      setLoading(true)
+      
+      const response = await fetch(`${apiUrl}/api/recovery/proposals/${pendingProposal.id}/confirm`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        alert(`✅ Azione eseguita: ${data.data.message}`)
+        // Refresh positions after action
+        await Promise.all([onRefreshPositions(), onRefreshOrders()])
+      } else {
+        alert(`❌ Errore: ${data.error || data.data?.message}`)
+      }
+    } catch (err) {
+      alert('Errore nella comunicazione con il backend')
+      console.error('Confirm proposal error:', err)
+    } finally {
+      setPendingProposal(null)
+      setLoading(false)
+    }
+  }
+
+  // ❌ Rifiuta proposta
+  const handleRejectProposal = async () => {
+    if (!pendingProposal) return
+    
+    try {
+      await fetch(`${apiUrl}/api/recovery/proposals/${pendingProposal.id}/reject`, {
+        method: 'POST'
+      })
+      alert('Proposta rifiutata - nessuna azione eseguita')
+    } catch (err) {
+      console.error('Reject proposal error:', err)
+    } finally {
+      setPendingProposal(null)
+    }
   }
 
   // Close position
@@ -138,6 +259,69 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
 
   return (
     <div className="space-y-6">
+      {/* 🛡️ Proposal Modal */}
+      {pendingProposal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Proposta Recovery
+              </h3>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {pendingProposal.description}
+                </p>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">
+                  Azione proposta:
+                </p>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                  {pendingProposal.proposedAction}
+                </p>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">
+                  Impatto:
+                </p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  {pendingProposal.impact}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleRejectProposal}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                ❌ Rifiuta
+              </button>
+              <button
+                onClick={handleConfirmProposal}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                ✅ Conferma
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -147,14 +331,25 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
             <span className="ml-2 text-xs text-green-500">● Live</span>
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-        >
-          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-          Aggiorna
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGlobalCheck}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors"
+            title="Verifica stato di tutti gli strumenti"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Check
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+            Aggiorna
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -224,11 +419,26 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
                       <h4 className="font-semibold text-gray-900 dark:text-white">
                         {group.instrument}
                       </h4>
-                      {group.positions.length > 0 && (
-                        <span className={cn("text-sm font-medium", getPnLColor(groupPnL))}>
-                          {groupPnL >= 0 ? '+' : ''}{formatCurrency(groupPnL)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {group.positions.length > 0 && (
+                          <span className={cn("text-sm font-medium", getPnLColor(groupPnL))}>
+                            {groupPnL >= 0 ? '+' : ''}{formatCurrency(groupPnL)}
+                          </span>
+                        )}
+                        {/* 🛡️ Check button per singolo strumento */}
+                        <button
+                          onClick={() => handleRecoveryCheck(group.epic, group.instrument)}
+                          disabled={checkingEpic === group.epic}
+                          className="p-1.5 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded transition-colors disabled:opacity-50"
+                          title="Verifica stato strumento"
+                        >
+                          {checkingEpic === group.epic ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {group.positions.length} posizioni • {group.orders.length} ordini
