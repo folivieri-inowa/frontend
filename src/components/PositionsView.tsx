@@ -300,6 +300,19 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
                   {pendingProposal.impact}
                 </p>
               </div>
+              
+              {/* ⚠️ Avviso speciale per azioni distruttive */}
+              {(pendingProposal.proposedAction === 'CLOSE_ALL' || pendingProposal.proposedAction === 'CLEAN_AND_RESTART') && (
+                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                  <p className="text-xs text-red-600 dark:text-red-400 font-bold mb-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    ATTENZIONE - AZIONE IRREVERSIBILE
+                  </p>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Se lo stato non è recuperabile, verranno <strong>chiuse tutte le posizioni</strong> e <strong>cancellati tutti gli ordini</strong> pendenti su questo strumento.
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="flex gap-3">
@@ -312,10 +325,18 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
               <button
                 onClick={handleConfirmProposal}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className={cn(
+                  "flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2",
+                  (pendingProposal.proposedAction === 'CLOSE_ALL' || pendingProposal.proposedAction === 'CLEAN_AND_RESTART')
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-blue-600 hover:bg-blue-700"
+                )}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                ✅ Conferma
+                {(pendingProposal.proposedAction === 'CLOSE_ALL' || pendingProposal.proposedAction === 'CLEAN_AND_RESTART')
+                  ? '⚠️ Conferma Chiusura'
+                  : '✅ Conferma'
+                }
               </button>
             </div>
           </motion.div>
