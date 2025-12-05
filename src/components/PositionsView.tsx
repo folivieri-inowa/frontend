@@ -549,7 +549,7 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-medium px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
-                                {order.type}
+                                Ordine
                               </span>
                               {dir === 'LONG' ? (
                                 <TrendingUp className="w-4 h-4 text-green-500" />

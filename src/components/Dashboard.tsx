@@ -52,6 +52,40 @@ const parsePnL = (pnlString: string | undefined): number => {
   return pnlString.includes('-') ? -Math.abs(value) : value
 }
 
+// Helper per formattare P&L con simbolo valuta corretto
+const formatPnL = (pnlString: string | undefined, currency: string | undefined): string => {
+  if (!pnlString) return '-'
+  // Mappa dei simboli valuta
+  const currencySymbols: Record<string, string> = {
+    'EUR': '€',
+    'E': '€',
+    'USD': '$',
+    'GBP': '£',
+    'JPY': '¥',
+    'CHF': 'CHF '
+  }
+  // Estrae il valore numerico (gestisce formati come "E12.34" o "-E12.34" o "12.34")
+  const match = pnlString.match(/([-]?)\s*[A-Z€$£¥]*\s*([\d,.]+)/)
+  if (!match) return pnlString
+  
+  const isNegative = pnlString.includes('-')
+  const numValue = match[2]
+  
+  // Determina il simbolo dalla currency o dalla stringa P&L
+  let symbol = '€' // default
+  if (currency && currencySymbols[currency]) {
+    symbol = currencySymbols[currency]
+  } else if (pnlString.match(/^-?\s*E/)) {
+    symbol = '€'
+  } else if (pnlString.match(/^-?\s*\$/)) {
+    symbol = '$'
+  } else if (pnlString.match(/^-?\s*£/)) {
+    symbol = '£'
+  }
+  
+  return `${isNegative ? '-' : ''}${symbol}${numValue}`
+}
+
 // Helper per formattare data
 const formatTxDate = (dateStr: string, short = false): string => {
   const date = new Date(dateStr)
@@ -367,7 +401,7 @@ export function Dashboard({ accountInfo }: DashboardProps) {
                       "text-right font-semibold text-sm md:text-base shrink-0 ml-3",
                       getPnLColor(pnlNum)
                     )}>
-                      {tx.profitAndLoss || '-'}
+                      {formatPnL(tx.profitAndLoss, tx.currency)}
                     </div>
                   </motion.div>
                 )
@@ -450,7 +484,7 @@ export function Dashboard({ accountInfo }: DashboardProps) {
                                     )}
                                   </div>
                                   <span className={cn("font-medium", getPnLColor(pnlNum))}>
-                                    {tx.profitAndLoss || '-'}
+                                    {formatPnL(tx.profitAndLoss, tx.currency)}
                                   </span>
                                 </div>
                               )
