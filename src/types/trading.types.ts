@@ -84,6 +84,7 @@ export type NotificationType =
   | 'cycle_complete'  // Ciclo completato
   | 'instrument_started' // Strumento avviato
   | 'instrument_stopped' // Strumento fermato
+  | 'ig_rejection'    // ⚠️ IG ha rifiutato un'operazione
   | 'error'           // Errore
   | 'warning'         // Avviso
   | 'info'            // Informazione
