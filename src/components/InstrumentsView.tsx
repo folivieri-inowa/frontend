@@ -12,7 +12,8 @@ import {
   X,
   Loader2,
   Power,
-  PlayCircle
+  PlayCircle,
+  Bot
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -43,6 +44,10 @@ export function InstrumentsView() {
   const [pausedEpics, setPausedEpics] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // 🤖 Recovery Agent automatic mode
+  const [automaticMode, setAutomaticMode] = useState<boolean>(true)
+  const [automaticModeLoading, setAutomaticModeLoading] = useState(false)
   
   // Modal state
   const [showStartModal, setShowStartModal] = useState(false)
@@ -103,9 +108,50 @@ export function InstrumentsView() {
     }
   }
 
+  // 🤖 Fetch recovery agent settings
+  const fetchRecoverySettings = async () => {
+    if (!apiUrl) return
+    try {
+      const response = await fetch(`${apiUrl}/api/recovery/settings`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setAutomaticMode(data.data.automaticMode)
+      }
+    } catch (err) {
+      console.error('Fetch recovery settings error:', err)
+    }
+  }
+
+  // 🤖 Toggle recovery agent automatic mode
+  const toggleAutomaticMode = async () => {
+    if (!apiUrl) return
+    try {
+      setAutomaticModeLoading(true)
+      const newMode = !automaticMode
+      
+      const response = await fetch(`${apiUrl}/api/recovery/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ automaticMode: newMode })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setAutomaticMode(data.data.automaticMode)
+      }
+    } catch (err) {
+      console.error('Toggle automatic mode error:', err)
+    } finally {
+      setAutomaticModeLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchInstruments()
     fetchPausedEpics()
+    fetchRecoverySettings()
     // No polling - gli strumenti non cambiano frequentemente
     // Usare il tasto Aggiorna per refresh manuale
   }, [])
@@ -326,6 +372,54 @@ export function InstrumentsView() {
         >
           <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           Aggiorna
+        </button>
+      </div>
+
+      {/* 🤖 Recovery Agent Toggle */}
+      <div className={cn(
+        "flex items-center justify-between p-4 rounded-lg border",
+        automaticMode 
+          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
+          : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+      )}>
+        <div className="flex items-center gap-3">
+          <Bot className={cn(
+            "w-6 h-6",
+            automaticMode ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"
+          )} />
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              Agente di Recovery Automatico
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {automaticMode 
+                ? "L'agente interviene automaticamente in caso di anomalie" 
+                : "L'agente è disabilitato - intervento manuale richiesto"
+              }
+            </p>
+          </div>
+        </div>
+        
+        <button
+          onClick={toggleAutomaticMode}
+          disabled={automaticModeLoading}
+          className={cn(
+            "relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+            automaticMode 
+              ? "bg-green-500 focus:ring-green-500" 
+              : "bg-gray-300 dark:bg-gray-600 focus:ring-gray-500"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform",
+              automaticMode ? "translate-x-7" : "translate-x-1"
+            )}
+          >
+            {automaticModeLoading && (
+              <Loader2 className="w-4 h-4 animate-spin absolute top-1 left-1 text-gray-400" />
+            )}
+          </span>
         </button>
       </div>
 
