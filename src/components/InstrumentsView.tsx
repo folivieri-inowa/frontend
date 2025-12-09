@@ -13,7 +13,8 @@ import {
   Loader2,
   Power,
   PlayCircle,
-  Bot
+  Bot,
+  Info
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -52,7 +53,10 @@ export function InstrumentsView() {
   // Modal state
   const [showStartModal, setShowStartModal] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
+  const [showMarketInfoModal, setShowMarketInfoModal] = useState(false)
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentConfig | null>(null)
+  const [marketInfo, setMarketInfo] = useState<any>(null)
+  const [marketInfoLoading, setMarketInfoLoading] = useState(false)
   
   // Form state
   const [startParams, setStartParams] = useState<StartParams>({
@@ -179,6 +183,32 @@ export function InstrumentsView() {
       orderDistanceDivisor: instrument.orderDistanceDivisor || 3
     })
     setShowConfigModal(true)
+  }
+
+  // Open market info modal
+  const handleOpenMarketInfo = async (instrument: InstrumentConfig) => {
+    setSelectedInstrument(instrument)
+    setShowMarketInfoModal(true)
+    setMarketInfoLoading(true)
+    setMarketInfo(null)
+    
+    try {
+      const response = await fetch(`${apiUrl}/api/instruments/${instrument.epic}/market-info`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setMarketInfo(data.data)
+      } else {
+        alert(`Errore: ${data.error}`)
+        setShowMarketInfoModal(false)
+      }
+    } catch (err) {
+      alert('Errore nel recupero info mercato')
+      console.error('Market info error:', err)
+      setShowMarketInfoModal(false)
+    } finally {
+      setMarketInfoLoading(false)
+    }
   }
 
   // Start instrument
@@ -469,14 +499,23 @@ export function InstrumentsView() {
                       )}
                     </div>
                     
-                    {/* Config button */}
-                    <button
-                      onClick={() => handleOpenConfig(instrument)}
-                      className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                      title="Configura"
-                    >
-                      <Settings2 className="w-4 h-4" />
-                    </button>
+                    {/* Info & Config buttons */}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleOpenMarketInfo(instrument)}
+                        className="p-2 text-blue-500 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                        title="Info Mercato IG"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenConfig(instrument)}
+                        className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Configura"
+                      >
+                        <Settings2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Config info */}
@@ -848,6 +887,165 @@ export function InstrumentsView() {
                     <Check className="w-4 h-4" />
                   )}
                   Salva
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Market Info Modal */}
+      <AnimatePresence>
+        {showMarketInfoModal && selectedInstrument && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowMarketInfoModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Info Mercato IG
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {selectedInstrument.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMarketInfoModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {marketInfoLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                </div>
+              ) : marketInfo ? (
+                <div className="space-y-6">
+                  {/* Distanza minima - EVIDENZIATA */}
+                  <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border-2 border-amber-500 dark:border-amber-400 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-amber-900 dark:text-amber-100 mb-3">
+                          ⚠️ Distanza Minima per TP/Stop
+                        </h4>
+                        
+                        {/* Distanza principale - EVIDENZIATA */}
+                        <div className="bg-amber-100 dark:bg-amber-900/30 rounded-lg p-3 mb-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                              Distanza Minima Richiesta:
+                            </span>
+                            <span className="text-2xl font-mono font-bold text-amber-900 dark:text-amber-100">
+                              {marketInfo.minNormalStopDistance || marketInfo.minStopDistance} punti
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dettagli aggiuntivi */}
+                        {marketInfo.minGuaranteedStopDistance > 0 && (
+                          <div className="space-y-1 text-xs mb-2">
+                            <div className="flex justify-between text-amber-800 dark:text-amber-200">
+                              <span>Guaranteed Stop:</span>
+                              <span className="font-mono font-semibold">
+                                {marketInfo.minGuaranteedStopDistance} punti
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-2 leading-relaxed">
+                          💡 <strong>Importante:</strong> Il valore di <strong>TP Points</strong> nel setup deve essere <strong>maggiore o uguale</strong> a questa distanza, altrimenti IG rifiuterà l'ordine.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info generali */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Tipo</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{marketInfo.instrumentType}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Valuta</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{marketInfo.currency}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">1 Pip =</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{marketInfo.onePipMeans}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Scaling Factor</div>
+                        <div className="font-mono text-gray-900 dark:text-white">{marketInfo.scalingFactor}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Bid</div>
+                        <div className="font-mono text-gray-900 dark:text-white">{marketInfo.bid.toFixed(5)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Offer</div>
+                        <div className="font-mono text-gray-900 dark:text-white">{marketInfo.offer.toFixed(5)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Spread</div>
+                        <div className="font-mono text-gray-900 dark:text-white">{marketInfo.spreadPoints.toFixed(5)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Limiti */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Limiti Operativi</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Min Deal Size</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{marketInfo.minDealSize}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Max Deal Size</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{marketInfo.maxDealSize}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Margin Factor</div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {marketInfo.marginFactor}{marketInfo.marginFactorUnit}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  Nessuna informazione disponibile
+                </div>
+              )}
+
+              {/* Close button */}
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowMarketInfoModal(false)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                  Chiudi
                 </button>
               </div>
             </motion.div>
