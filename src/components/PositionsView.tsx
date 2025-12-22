@@ -4,7 +4,6 @@ import {
   TrendingUp, 
   TrendingDown, 
   RefreshCw, 
-  X,
   Loader2,
   Target,
   DollarSign,
@@ -42,7 +41,6 @@ interface PositionsViewProps {
 export function PositionsView({ positions, orders, onRefreshPositions, onRefreshOrders }: PositionsViewProps) {
   const { apiUrl } = useAuthStore()
   const [loading, setLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [checkingEpic, setCheckingEpic] = useState<string | null>(null)
   const [pendingProposal, setPendingProposal] = useState<RecoveryProposal | null>(null)
 
@@ -158,58 +156,6 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
       console.error('Reject proposal error:', err)
     } finally {
       setPendingProposal(null)
-    }
-  }
-
-  // Close position
-  const handleClosePosition = async (position: { id: string; instrument?: string }) => {
-    if (!confirm(`Chiudere la posizione ${position.instrument}?`)) return
-    
-    try {
-      setActionLoading(position.id)
-      const response = await fetch(`${apiUrl}/api/positions/${position.id}/close`, {
-        method: 'POST'
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        // Refresh via WebSocket callback
-        onRefreshPositions()
-      } else {
-        alert(`Errore: ${data.error}`)
-      }
-    } catch (err) {
-      alert('Errore nella comunicazione con il backend')
-      console.error('Close error:', err)
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  // Cancel order
-  const handleCancelOrder = async (order: { id: string; instrument?: string }) => {
-    if (!confirm(`Annullare l'ordine ${order.instrument}?`)) return
-    
-    try {
-      setActionLoading(order.id)
-      const response = await fetch(`${apiUrl}/api/orders/${order.id}/cancel`, {
-        method: 'POST'
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        // Refresh via WebSocket callback
-        onRefreshOrders()
-      } else {
-        alert(`Errore: ${data.error}`)
-      }
-    } catch (err) {
-      alert('Errore nella comunicazione con il backend')
-      console.error('Cancel error:', err)
-    } finally {
-      setActionLoading(null)
     }
   }
 
@@ -467,73 +413,86 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
                   </div>
                   
                   <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {/* Positions */}
-                    {group.positions.map((position) => {
-                      const dir = normalizeDirection(position.direction)
-                      const tpLevel = position.tpLevel || position.limitLevel
-                      return (
-                        <motion.div
-                          key={position.id}
-                          className="p-4 bg-blue-50/30 dark:bg-blue-900/10"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                                POSIZIONE
-                              </span>
-                              {dir === 'LONG' ? (
-                                <TrendingUp className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <TrendingDown className="w-4 h-4 text-red-500" />
-                              )}
-                              <span className={cn(
-                                "font-semibold text-sm",
-                                dir === 'LONG' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                              )}>
-                                {dir} {position.contracts}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => handleClosePosition(position)}
-                              disabled={actionLoading === position.id}
-                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
-                              title="Chiudi posizione"
-                            >
-                              {actionLoading === position.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <X className="w-4 h-4" />
-                              )}
-                            </button>
+                    {/* Aggregated Positions Summary */}
+                    {group.positions.length > 0 && (
+                      <motion.div
+                        className="p-4 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/10 dark:to-purple-900/10"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                              POSIZIONI ({group.positions.length})
+                            </span>
                           </div>
-                          
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">Open:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
-                                {formatNumber(position.openPrice)}
-                              </span>
-                            </div>
-                            {tpLevel && (
-                              <div>
-                                <span className="text-gray-500 dark:text-gray-400">TP:</span>
-                                <span className="ml-1 font-medium text-green-600 dark:text-green-400">
-                                  {formatNumber(tpLevel)}
-                                </span>
+                          <span className={cn("text-lg font-bold", getPnLColor(groupPnL))}>
+                            {groupPnL >= 0 ? '+' : ''}{formatCurrency(groupPnL)}
+                          </span>
+                        </div>
+                        
+                        {/* Breakdown per direzione */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {/* LONG positions */}
+                          {(() => {
+                            const longPositions = group.positions.filter(p => normalizeDirection(p.direction) === 'LONG')
+                            const longContracts = longPositions.reduce((sum, p) => sum + p.contracts, 0)
+                            const longPnL = longPositions.reduce((sum, p) => sum + (p.pnl || 0), 0)
+                            return longPositions.length > 0 ? (
+                              <div className="bg-green-50/50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <TrendingUp className="w-4 h-4 text-green-500" />
+                                  <span className="font-semibold text-green-600 dark:text-green-400">
+                                    LONG × {longContracts}
+                                  </span>
+                                </div>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-400">Posizioni:</span>
+                                    <span className="font-medium">{longPositions.length}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-400">P&L:</span>
+                                    <span className={cn("font-bold", getPnLColor(longPnL))}>
+                                      {longPnL >= 0 ? '+' : ''}{formatCurrency(longPnL)}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">P&L:</span>
-                              <span className={cn("ml-1 font-bold", getPnLColor(position.pnl || 0))}>
-                                {formatCurrency(position.pnl || 0)}
-                              </span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )
-                    })}
+                            ) : null
+                          })()}
+                          
+                          {/* SHORT positions */}
+                          {(() => {
+                            const shortPositions = group.positions.filter(p => normalizeDirection(p.direction) === 'SHORT')
+                            const shortContracts = shortPositions.reduce((sum, p) => sum + p.contracts, 0)
+                            const shortPnL = shortPositions.reduce((sum, p) => sum + (p.pnl || 0), 0)
+                            return shortPositions.length > 0 ? (
+                              <div className="bg-red-50/50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <TrendingDown className="w-4 h-4 text-red-500" />
+                                  <span className="font-semibold text-red-600 dark:text-red-400">
+                                    SHORT × {shortContracts}
+                                  </span>
+                                </div>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-400">Posizioni:</span>
+                                    <span className="font-medium">{shortPositions.length}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-400">P&L:</span>
+                                    <span className={cn("font-bold", getPnLColor(shortPnL))}>
+                                      {shortPnL >= 0 ? '+' : ''}{formatCurrency(shortPnL)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
                     
                     {/* Orders */}
                     {group.orders.map((order) => {
@@ -563,18 +522,7 @@ export function PositionsView({ positions, orders, onRefreshPositions, onRefresh
                                 {dir} {order.contracts}
                               </span>
                             </div>
-                            <button
-                              onClick={() => handleCancelOrder(order)}
-                              disabled={actionLoading === order.id}
-                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
-                              title="Annulla ordine"
-                            >
-                              {actionLoading === order.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <X className="w-4 h-4" />
-                              )}
-                            </button>
+
                           </div>
                           
                           <div className="grid grid-cols-3 gap-2 text-xs">

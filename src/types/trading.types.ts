@@ -36,6 +36,9 @@ export interface SystemStatus {
   sessionAge?: string
   uptime?: string
   lightstreamerStatus?: string
+  // 🆕 Dettagli per monitoraggio connessione
+  lastUpdateAt?: string | null
+  secondsSinceUpdate?: number | null
 }
 
 export interface AccountInfo {

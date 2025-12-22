@@ -264,9 +264,9 @@ export function InstrumentsView() {
     }
   }
 
-  // Shutdown instrument (chiude tutto e mette in pausa)
+  // Shutdown instrument (chiude tutto e resetta a PHASE_0_STARTUP)
   const handleShutdown = async (instrument: InstrumentConfig) => {
-    if (!confirm(`⚠️ SHUTDOWN COMPLETO di ${instrument.name}?\n\nQuesta operazione:\n• Chiuderà TUTTE le posizioni aperte\n• Cancellerà TUTTI gli ordini pendenti\n• Metterà lo strumento in PAUSA\n\nGenesis NON reagirà più agli eventi su questo strumento fino a quando non lo riattiverai.`)) return
+    if (!confirm(`⚠️ SHUTDOWN COMPLETO di ${instrument.name}?\n\nQuesta operazione:\n• Chiuderà TUTTE le posizioni aperte\n• Cancellerà TUTTI gli ordini pendenti\n• Riporterà lo strumento alla fase iniziale\n\nPotrai poi cliccare "Avvia" per ricominciare.`)) return
     
     try {
       setActionLoading(instrument.epic)
@@ -277,7 +277,7 @@ export function InstrumentsView() {
       const data = await response.json()
       
       if (data.success) {
-        alert(`✅ Shutdown completato per ${instrument.name}\n\nPosizioni chiuse: ${data.data.positionsClosed}\nOrdini cancellati: ${data.data.ordersCancelled}\n\nLo strumento è ora in PAUSA.`)
+        alert(`✅ Shutdown completato per ${instrument.name}\n\nPosizioni chiuse: ${data.data.positionsClosed}\nOrdini cancellati: ${data.data.ordersCancelled}\n\nClicca "Avvia" per ricominciare.`)
         fetchInstruments()
         fetchPausedEpics()
       } else {

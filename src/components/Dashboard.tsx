@@ -43,6 +43,22 @@ interface DashboardProps {
   onRefreshOrders?: () => Promise<boolean>
 }
 
+// Helper per normalizzare il nome strumento (raggruppa varianti come "US 500 Cash" e "US 500")
+const normalizeInstrumentName = (name: string): string => {
+  if (!name) return name
+  // Rimuovi suffissi comuni che creano varianti dello stesso strumento
+  return name
+    .replace(/\s*\([^)]*\)\s*/g, '')      // Rimuovi contenuto tra parentesi es. "(1€)", "($1)"
+    .replace(/\s+Cash\s*/gi, ' ')          // Rimuovi "Cash"
+    .replace(/\s+Mini\s*/gi, ' ')          // Rimuovi "Mini"  
+    .replace(/\s+Spot\s*/gi, ' ')          // Rimuovi "Spot"
+    .replace(/\s+Forward\s*/gi, ' ')       // Rimuovi "Forward"
+    .replace(/\s+CFD\s*/gi, ' ')           // Rimuovi "CFD"
+    .replace(/\s+DFB\s*/gi, ' ')           // Rimuovi "DFB"
+    .trim()
+    .replace(/\s+/g, ' ')                   // Normalizza spazi multipli
+}
+
 // Helper per estrarre valore numerico dal P&L
 const parsePnL = (pnlString: string | undefined): number => {
   if (!pnlString) return 0
@@ -162,18 +178,19 @@ export function Dashboard({ accountInfo }: DashboardProps) {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [transactions, timeFilter])
 
-  // Raggruppa transazioni per strumento
+  // Raggruppa transazioni per strumento (con normalizzazione nomi)
   const groupedTransactions = useMemo(() => {
-    const groups: Record<string, { transactions: Transaction[], totalPnL: number, count: number }> = {}
+    const groups: Record<string, { transactions: Transaction[], totalPnL: number, count: number, displayName: string }> = {}
     
     filteredTransactions.forEach(tx => {
-      const key = tx.instrumentName
-      if (!groups[key]) {
-        groups[key] = { transactions: [], totalPnL: 0, count: 0 }
+      // Usa nome normalizzato come chiave per raggruppare varianti dello stesso strumento
+      const normalizedKey = normalizeInstrumentName(tx.instrumentName)
+      if (!groups[normalizedKey]) {
+        groups[normalizedKey] = { transactions: [], totalPnL: 0, count: 0, displayName: tx.instrumentName }
       }
-      groups[key].transactions.push(tx)
-      groups[key].totalPnL += parsePnL(tx.profitAndLoss)
-      groups[key].count++
+      groups[normalizedKey].transactions.push(tx)
+      groups[normalizedKey].totalPnL += parsePnL(tx.profitAndLoss)
+      groups[normalizedKey].count++
     })
 
     // Ordina per P&L totale (dal più alto al più basso)
@@ -433,7 +450,7 @@ export function Dashboard({ accountInfo }: DashboardProps) {
                         )} />
                         <div className="text-left">
                           <div className="font-medium text-gray-900 dark:text-white">
-                            {instrument}
+                            {data.displayName || instrument}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {data.count} operazion{data.count === 1 ? 'e' : 'i'}

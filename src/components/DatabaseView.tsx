@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   Table2,
   Loader2,
-  Zap
+  Zap,
+  Trash2
 } from 'lucide-react'
 
 // Tipi
@@ -127,6 +128,8 @@ export function DatabaseView() {
   const [tableData, setTableData] = useState<any[]>([])
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [loadingData, setLoadingData] = useState(false)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   // Fetch tabelle e sync status
   const fetchTablesAndSync = useCallback(async () => {
@@ -194,6 +197,29 @@ export function DatabaseView() {
     }
   }
 
+  // Reset database
+  const handleResetDatabase = async () => {
+    if (!apiUrl) return
+    setResetting(true)
+    
+    try {
+      const res = await fetch(`${apiUrl}/api/db/reset`, { method: 'POST' })
+      if (res.ok) {
+        setShowResetModal(false)
+        setSelectedTable(null)
+        setTableData([])
+        await fetchTablesAndSync()
+      } else {
+        alert('Errore durante il reset del database')
+      }
+    } catch (error) {
+      console.error('Error resetting database:', error)
+      alert('Errore durante il reset del database')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   useEffect(() => {
     fetchTablesAndSync()
   }, [fetchTablesAndSync])
@@ -221,6 +247,67 @@ export function DatabaseView() {
 
   return (
     <div className="space-y-6">
+      {/* Reset Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Reset Database
+              </h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+              Sei sicuro di voler resettare completamente il database? Questa operazione:
+            </p>
+            
+            <ul className="text-sm text-gray-600 dark:text-gray-300 mb-6 space-y-2 list-disc list-inside">
+              <li>Eliminerà tutte le posizioni salvate</li>
+              <li>Eliminerà tutti gli ordini salvati</li>
+              <li>Eliminerà lo storico dei trade</li>
+              <li>Resetterà tutte le configurazioni</li>
+              <li className="font-bold text-red-600 dark:text-red-400">Questa azione è IRREVERSIBILE</li>
+            </ul>
+            
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setShowResetModal(false)}
+                variant="secondary"
+                className="flex-1"
+                disabled={resetting}
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleResetDatabase}
+                variant="danger"
+                className="flex-1"
+                disabled={resetting}
+              >
+                {resetting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Reset DB
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -234,14 +321,24 @@ export function DatabaseView() {
             </p>
           </div>
         </div>
-        <Button 
-          onClick={() => fetchTablesAndSync()}
-          variant="ghost"
-          size="sm"
-        >
-          <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
-          Aggiorna
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => fetchTablesAndSync()}
+            variant="ghost"
+            size="sm"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
+            Aggiorna
+          </Button>
+          <Button 
+            onClick={() => setShowResetModal(true)}
+            variant="danger"
+            size="sm"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Reset DB
+          </Button>
+        </div>
       </div>
 
       {/* Sync Status Card */}

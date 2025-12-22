@@ -3,17 +3,21 @@ import { Menu, Moon, Sun, User, LogOut, MoreVertical, Wifi, Activity } from 'luc
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { NotificationCenter } from '@/components/NotificationCenter'
+import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { useState, useEffect, useRef } from 'react'
-import type { Notification } from '@/types/trading.types'
+import type { Notification, SystemStatus } from '@/types/trading.types'
 
 interface HeaderProps {
   onToggleSidebar: () => void
   systemStatus: {
     isRunning: boolean
     sessionActive: boolean
-    sessionAge?: number
+    sessionAge?: number | string
     streamStatus: string
+    secondsSinceUpdate?: number
   }
+  fullSystemStatus?: SystemStatus
+  onForceReconnect?: () => Promise<{ success: boolean; error?: string }>
   userLabel?: string
   onLogout?: () => void
   notifications?: Notification[]
@@ -26,6 +30,8 @@ interface HeaderProps {
 export function Header({ 
   onToggleSidebar, 
   systemStatus, 
+  fullSystemStatus,
+  onForceReconnect,
   userLabel, 
   onLogout,
   notifications = [],
@@ -79,10 +85,13 @@ export function Header({
     return 'Stopped'
   }
 
-  const formatSessionAge = (hours?: number) => {
-    if (!hours) return ''
-    const h = Math.floor(hours)
-    const m = Math.floor((hours - h) * 60)
+  const formatSessionAge = (age?: number | string) => {
+    if (!age) return ''
+    // Se è stringa (nuovo formato), usala direttamente
+    if (typeof age === 'string') return ` (${age})`
+    // Se è numero (vecchio formato in ore)
+    const h = Math.floor(age)
+    const m = Math.floor((age - h) * 60)
     return ` (${h}h ${m}m)`
   }
 
@@ -113,9 +122,20 @@ export function Header({
 
       {/* Desktop: tutti i controlli visibili */}
       <div className="hidden md:flex items-center gap-4">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Stream: <span className="font-medium">{systemStatus.streamStatus}</span>
-        </div>
+        {/* Connection Status - nuovo componente interattivo */}
+        {fullSystemStatus && onForceReconnect && (
+          <ConnectionStatus 
+            systemStatus={fullSystemStatus}
+            onForceReconnect={onForceReconnect}
+          />
+        )}
+        
+        {/* Fallback: vecchio indicatore stream se non ci sono le nuove props */}
+        {!fullSystemStatus && (
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Stream: <span className="font-medium">{systemStatus.streamStatus}</span>
+          </div>
+        )}
         
         {/* User info */}
         {userLabel && (

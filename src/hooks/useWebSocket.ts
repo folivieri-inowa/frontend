@@ -10,6 +10,8 @@ export function useWebSocket() {
     status: 'STOPPED',
     igConnected: false,
     lightstreamerConnected: false,
+    lastUpdateAt: null,
+    secondsSinceUpdate: null,
   })
   const [accountInfo, setAccountInfo] = useState<AccountInfo>({
     balance: 0,
@@ -50,7 +52,8 @@ export function useWebSocket() {
         // Fetch positions
         const positionsRes = await fetch(`${apiUrl}/api/positions`)
         if (positionsRes.ok) {
-          const positionsData = await positionsRes.json()
+          const positionsResponse = await positionsRes.json()
+          const positionsData = positionsResponse.data || positionsResponse
           if (Array.isArray(positionsData) && positionsData.length > 0) {
             setPositions(positionsData)
             console.log(`✅ Loaded ${positionsData.length} positions`)
@@ -60,7 +63,8 @@ export function useWebSocket() {
         // Fetch orders
         const ordersRes = await fetch(`${apiUrl}/api/orders`)
         if (ordersRes.ok) {
-          const ordersData = await ordersRes.json()
+          const ordersResponse = await ordersRes.json()
+          const ordersData = ordersResponse.data || ordersResponse
           if (Array.isArray(ordersData) && ordersData.length > 0) {
             setOrders(ordersData)
             console.log(`✅ Loaded ${ordersData.length} orders`)
@@ -132,7 +136,9 @@ export function useWebSocket() {
           igConnected: message.data.igConnected !== undefined ? message.data.igConnected : prev.igConnected,
           lightstreamerConnected: message.data.lightstreamerConnected !== undefined ? message.data.lightstreamerConnected : prev.lightstreamerConnected,
           sessionAge: message.data.sessionAge,
-          uptime: message.data.uptime
+          uptime: message.data.uptime,
+          lastUpdateAt: message.data.lastUpdateAt,
+          secondsSinceUpdate: message.data.secondsSinceUpdate
         }))
         break
       
@@ -227,13 +233,11 @@ export function useWebSocket() {
               // Per LONG usiamo bid (prezzo di vendita), per SHORT usiamo offer (prezzo di acquisto)
               const currentPrice = pos.direction === 'LONG' ? bid : offer
               if (currentPrice && pos.openPrice) {
-                // Calcola P&L
-                const pnl = pos.direction === 'LONG'
-                  ? (currentPrice - pos.openPrice) * pos.contracts
-                  : (pos.openPrice - currentPrice) * pos.contracts
-                
                 updated = true
-                return { ...pos, currentPrice, pnl }
+                // NON ricalcoliamo il P&L qui - viene calcolato correttamente dal backend
+                // perché la formula (currentPrice - openPrice) * contracts non funziona 
+                // per forex (serve contractSize e conversione valuta)
+                return { ...pos, currentPrice }
               }
             }
             return pos
@@ -312,6 +316,45 @@ export function useWebSocket() {
     setNotifications([])
   }, [])
 
+  // 🔄 Force reconnection to IG
+  const forceReconnect = useCallback(async () => {
+    if (!apiUrl) return { success: false, error: 'API URL not configured' }
+    
+    try {
+      console.log('🔄 Forcing IG reconnection...')
+      const response = await fetch(`${apiUrl}/api/connection/reconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('✅ Reconnection initiated')
+      } else {
+        console.error('❌ Reconnection failed:', result.error)
+      }
+      
+      return result
+    } catch (error) {
+      console.error('❌ Failed to force reconnect:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  }, [apiUrl])
+
+  // 📊 Get detailed connection status
+  const getConnectionStatus = useCallback(async () => {
+    if (!apiUrl) return null
+    
+    try {
+      const response = await fetch(`${apiUrl}/api/connection/status`)
+      const result = await response.json()
+      return result.success ? result.data : null
+    } catch (error) {
+      console.error('❌ Failed to get connection status:', error)
+      return null
+    }
+  }, [apiUrl])
+
   return {
     isConnected,
     systemStatus,
@@ -327,5 +370,7 @@ export function useWebSocket() {
     markAllNotificationsAsRead,
     clearNotification,
     clearAllNotifications,
+    forceReconnect,
+    getConnectionStatus,
   }
 }

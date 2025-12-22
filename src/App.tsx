@@ -55,6 +55,7 @@ function App() {
     markAllNotificationsAsRead,
     clearNotification,
     clearAllNotifications,
+    forceReconnect,
   } = useWebSocket()
 
   return (
@@ -64,8 +65,12 @@ function App() {
         systemStatus={{
           isRunning: systemStatus.status === 'ACTIVE',
           sessionActive: systemStatus.igConnected,
-          streamStatus: systemStatus.lightstreamerConnected ? 'CONNECTED' : 'DISCONNECTED'
+          streamStatus: systemStatus.lightstreamerConnected ? 'CONNECTED' : 'DISCONNECTED',
+          sessionAge: systemStatus.sessionAge,
+          secondsSinceUpdate: systemStatus.secondsSinceUpdate ?? undefined
         }}
+        fullSystemStatus={systemStatus}
+        onForceReconnect={forceReconnect}
         userLabel={backendConfig?.label}
         onLogout={logout}
         notifications={notifications}
