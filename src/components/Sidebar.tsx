@@ -6,7 +6,8 @@ import {
   ChevronRight,
   Boxes,
   BarChart3,
-  Database
+  Database,
+  Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'instruments', label: 'Strumenti', icon: Boxes },
   { id: 'positions', label: 'Posizioni', icon: TrendingUp },
+  { id: 'activity', label: 'Attività', icon: Activity },
   { id: 'statistics', label: 'Statistiche', icon: BarChart3 },
   { id: 'database', label: 'Database', icon: Database },
 ]
