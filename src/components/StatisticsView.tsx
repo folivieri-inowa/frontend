@@ -1,95 +1,110 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { formatCurrency, formatNumber, cn } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { 
   TrendingUp, 
   TrendingDown,
-  Clock,
-  BarChart3,
   RefreshCw,
   Target,
-  Zap,
-  Award,
-  Activity,
-  Loader2
+  Shield,
+  Loader2,
+  Calendar,
+  Clock,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Percent,
+  CheckCircle2,
+  XCircle,
+  Filter
 } from 'lucide-react'
 
-// Tipi per le statistiche
-interface InstrumentStat {
-  epic: string
-  instrument: string
-  cycles: number
-  profitEUR: number
-  winRate: number
-  lastCycle: string | null
+// Tipi
+interface StatsOverview {
+  totals: {
+    profit: number
+    loss: number
+    netPnL: number
+    winningTrades: number
+    losingTrades: number
+    winRate: number
+  }
+  cycles: {
+    completed: number      // Cicli completati (falciatura finale)
+    coverageExits: number  // Uscite tramite copertura
+  }
+  byInstrument: Array<{
+    epic: string
+    instrument: string
+    totalCycles: number
+    completedCycles: number
+    coverageExits: number
+    profitEUR: number
+    winRate: number
+    lastActivity: string | null
+  }>
 }
 
-interface RecentCycle {
+interface Trade {
+  id: number
   epic: string
   instrument: string
+  direction: string
+  contracts: number
+  openPrice: number
+  closePrice: number
+  openedAt: string
+  closedAt: string
+  profitPct: number
+  profitEUR: number
+  closeReason: string
+  closePhase: string
+  isCoverage: boolean
+  wasHarvested: boolean
+  date: string
+  time: string
   type: string
-  description: string
-  profitEUR: number
-  duration: string
-  completedAt: string
-}
-
-interface GlobalStats {
-  totalInstruments: number
-  totalCycles: number
-  totalProfitEUR: number
-  avgWinRate: number
-}
-
-interface TodayStats {
-  cycles: number
-  profitEUR: number
-}
-
-interface StatsSummary {
-  global: GlobalStats
-  today: TodayStats
-  recentCycles: RecentCycle[]
-  byInstrument: InstrumentStat[]
-}
-
-// Mapping tipi ciclo a emoji/label
-const CYCLE_TYPE_MAP: Record<string, { emoji: string; label: string; color: string }> = {
-  'STARTUP': { emoji: '🚀', label: 'Avvio', color: 'text-blue-500' },
-  'TP_FLIP': { emoji: '🎯', label: 'TP Flip', color: 'text-green-500' },
-  'HARVEST_PARTIAL': { emoji: '🌾', label: 'Falciatura', color: 'text-amber-500' },
-  'HARVEST_FULL': { emoji: '💰', label: 'Chiusura', color: 'text-green-600' },
-  'COVERAGE_ACTIVATED': { emoji: '🛡️', label: 'Copertura', color: 'text-purple-500' },
-  'COVERAGE_CLOSED': { emoji: '✅', label: 'Fine Copertura', color: 'text-teal-500' },
-  'MANUAL_CLOSE': { emoji: '👤', label: 'Manuale', color: 'text-gray-500' },
 }
 
 export function StatisticsView() {
   const { apiUrl } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [stats, setStats] = useState<StatsSummary | null>(null)
+  const [overview, setOverview] = useState<StatsOverview | null>(null)
+  const [trades, setTrades] = useState<Trade[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [selectedEpic, setSelectedEpic] = useState<string>('all')
+  const [tradesLimit, setTradesLimit] = useState(50)
 
-  const fetchStats = useCallback(async (showRefresh = false) => {
+  const fetchData = useCallback(async (showRefresh = false) => {
     if (!apiUrl) return
     
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
     
     try {
-      const res = await fetch(`${apiUrl}/api/stats/summary`)
-      if (!res.ok) throw new Error('Failed to fetch stats')
+      // Fetch overview
+      const overviewRes = await fetch(`${apiUrl}/api/stats/overview`)
+      const overviewData = await overviewRes.json()
       
-      const { success, data } = await res.json()
-      if (success && data) {
-        setStats(data)
-        setError(null)
+      if (overviewData.success) {
+        setOverview(overviewData.data)
       }
+
+      // Fetch trades
+      const tradesUrl = selectedEpic === 'all' 
+        ? `${apiUrl}/api/stats/trades?limit=${tradesLimit}`
+        : `${apiUrl}/api/stats/trades?limit=${tradesLimit}&epic=${selectedEpic}`
+      
+      const tradesRes = await fetch(tradesUrl)
+      const tradesData = await tradesRes.json()
+      
+      if (tradesData.success) {
+        setTrades(tradesData.data.trades)
+      }
+
+      setError(null)
     } catch (err) {
       console.error('Error fetching stats:', err)
       setError('Impossibile caricare le statistiche')
@@ -97,11 +112,11 @@ export function StatisticsView() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [apiUrl])
+  }, [apiUrl, selectedEpic, tradesLimit])
 
   useEffect(() => {
-    fetchStats()
-  }, [fetchStats])
+    fetchData()
+  }, [fetchData])
 
   if (loading) {
     return (
@@ -111,11 +126,11 @@ export function StatisticsView() {
     )
   }
 
-  if (error || !stats) {
+  if (error || !overview) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-gray-500 dark:text-gray-400">{error || 'Nessun dato disponibile'}</p>
-        <Button onClick={() => fetchStats()}>
+        <Button onClick={() => fetchData()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Riprova
         </Button>
@@ -123,278 +138,367 @@ export function StatisticsView() {
     )
   }
 
-  const { global, today, recentCycles, byInstrument } = stats
+  const { totals, cycles, byInstrument } = overview
+  const totalTrades = totals.winningTrades + totals.losingTrades
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Statistiche
+          📊 Statistiche
         </h2>
-        <div className="flex items-center gap-3">
-          <Badge variant={today.profitEUR >= 0 ? 'success' : 'error'}>
-            Oggi: {today.profitEUR >= 0 ? '+' : ''}{formatCurrency(today.profitEUR)}
-          </Badge>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => fetchStats(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
-          </Button>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => fetchData(true)}
+          disabled={refreshing}
+        >
+          <RefreshCw className={cn("w-4 h-4 mr-2", refreshing && "animate-spin")} />
+          Aggiorna
+        </Button>
       </div>
 
-      {/* Stat Cards Principali */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Profitto Totale"
-          value={formatCurrency(global.totalProfitEUR)}
-          icon={global.totalProfitEUR >= 0 ? TrendingUp : TrendingDown}
-          trend={global.totalProfitEUR >= 0 ? 'up' : 'down'}
-          subtitle={`${global.totalCycles} cicli completati`}
-        />
-        <StatCard
-          title="Win Rate Medio"
-          value={`${global.avgWinRate.toFixed(1)}%`}
-          icon={Target}
-          trend={global.avgWinRate >= 50 ? 'up' : 'down'}
-          subtitle={`Su ${global.totalInstruments} strumenti`}
-        />
-        <StatCard
-          title="Cicli Oggi"
-          value={formatNumber(today.cycles)}
-          icon={Zap}
-          trend="neutral"
-          subtitle={`${today.profitEUR >= 0 ? '+' : ''}${formatCurrency(today.profitEUR)}`}
-        />
-        <StatCard
-          title="Strumenti Attivi"
-          value={formatNumber(global.totalInstruments)}
-          icon={Activity}
-          trend="neutral"
-          subtitle="Con statistiche"
-        />
+      {/* Cards Principali - P&L Totale */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Profitto Netto */}
+        <motion.div
+          className={cn(
+            "rounded-xl p-5 border shadow-sm",
+            totals.netPnL >= 0 
+              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+              : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+          )}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            {totals.netPnL >= 0 ? (
+              <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
+            ) : (
+              <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
+            )}
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              P&L Netto
+            </span>
+          </div>
+          <p className={cn(
+            "text-3xl font-bold",
+            totals.netPnL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+          )}>
+            {totals.netPnL >= 0 ? '+' : ''}{formatCurrency(totals.netPnL)}
+          </p>
+        </motion.div>
+
+        {/* Profitti Totali */}
+        <motion.div
+          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <ArrowUpCircle className="w-6 h-6 text-green-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Profitti
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            +{formatCurrency(totals.profit)}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {totals.winningTrades} operazioni
+          </p>
+        </motion.div>
+
+        {/* Perdite Totali */}
+        <motion.div
+          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <ArrowDownCircle className="w-6 h-6 text-red-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Perdite
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            -{formatCurrency(totals.loss)}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {totals.losingTrades} operazioni
+          </p>
+        </motion.div>
+
+        {/* Win Rate */}
+        <motion.div
+          className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Percent className="w-6 h-6 text-blue-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Win Rate
+            </span>
+          </div>
+          <p className={cn(
+            "text-2xl font-bold",
+            totals.winRate >= 50 ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+          )}>
+            {totals.winRate.toFixed(1)}%
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {totals.winningTrades}/{totalTrades} operazioni
+          </p>
+        </motion.div>
       </div>
 
-      {/* Statistiche per Strumento */}
+      {/* Cicli */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Cicli Completati */}
+        <motion.div
+          className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-5 border border-emerald-200 dark:border-emerald-800 shadow-sm"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                  Cicli Completati
+                </span>
+              </div>
+              <p className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">
+                {cycles.completed}
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-2">
+                Fase 2 → Falciatura → Chiusura completa
+              </p>
+            </div>
+            <CheckCircle2 className="w-12 h-12 text-emerald-200 dark:text-emerald-800" />
+          </div>
+        </motion.div>
+
+        {/* Uscite Copertura */}
+        <motion.div
+          className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-5 border border-purple-200 dark:border-purple-800 shadow-sm"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                  Uscite Copertura
+                </span>
+              </div>
+              <p className="text-4xl font-bold text-purple-600 dark:text-purple-400">
+                {cycles.coverageExits}
+              </p>
+              <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-2">
+                Chiusura anticipata tramite ordine copertura
+              </p>
+            </div>
+            <XCircle className="w-12 h-12 text-purple-200 dark:text-purple-800" />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Statistiche per Cross */}
       {byInstrument.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              Performance per Strumento
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <th className="pb-3">Strumento</th>
-                    <th className="pb-3 text-center">Cicli</th>
-                    <th className="pb-3 text-center">Win Rate</th>
-                    <th className="pb-3 text-right">Profitto</th>
-                    <th className="pb-3 text-right">Ultimo Ciclo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {byInstrument.map((instr, idx) => (
-                    <motion.tr
-                      key={instr.epic}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    >
-                      <td className="py-3">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {instr.instrument}
-                          </p>
-                          <p className="text-xs text-gray-500">{instr.epic}</p>
-                        </div>
-                      </td>
-                      <td className="py-3 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                          {instr.cycles}
-                        </span>
-                      </td>
-                      <td className="py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className={cn(
-                                "h-2 rounded-full",
-                                instr.winRate >= 60 ? "bg-green-500" :
-                                instr.winRate >= 40 ? "bg-yellow-500" : "bg-red-500"
-                              )}
-                              style={{ width: `${Math.min(instr.winRate, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium w-12 text-right">
-                            {instr.winRate.toFixed(0)}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className={cn(
-                        "py-3 text-right font-semibold",
-                        instr.profitEUR >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                      )}>
-                        {instr.profitEUR >= 0 ? '+' : ''}{formatCurrency(instr.profitEUR)}
-                      </td>
-                      <td className="py-3 text-right text-sm text-gray-500">
-                        {instr.lastCycle ? formatTimeAgo(new Date(instr.lastCycle)) : '-'}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Cicli Recenti */}
-      {recentCycles.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Cicli Recenti
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentCycles.map((cycle, idx) => {
-                const typeInfo = CYCLE_TYPE_MAP[cycle.type] || { emoji: '📊', label: cycle.type, color: 'text-gray-500' }
-                return (
-                  <motion.div
-                    key={`${cycle.epic}-${idx}`}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{typeInfo.emoji}</span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {cycle.instrument}
-                          </span>
-                          <Badge variant="default" className={cn("text-xs", typeInfo.color)}>
-                            {typeInfo.label}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {cycle.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={cn(
-                        "font-semibold",
-                        cycle.profitEUR >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                      )}>
-                        {cycle.profitEUR >= 0 ? '+' : ''}{formatCurrency(cycle.profitEUR)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {cycle.duration} • {formatTimeAgo(new Date(cycle.completedAt))}
-                      </p>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty State */}
-      {global.totalCycles === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Award className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Nessuna statistica ancora
+        <motion.div
+          className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              📈 Statistiche per Cross
             </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
-              Le statistiche verranno generate automaticamente quando completerai i primi cicli di trading.
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cross</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cicli</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Completati</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Coperture</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P&L</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Win Rate</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ultima Attività</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {byInstrument.map((item) => (
+                  <tr 
+                    key={item.epic}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedEpic(item.epic)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {item.instrument}
+                      </div>
+                      <div className="text-xs text-gray-500">{item.epic}</div>
+                    </td>
+                    <td className="px-4 py-3 text-center font-medium">
+                      {item.totalCycles}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                        {item.completedCycles}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                        {item.coverageExits}
+                      </span>
+                    </td>
+                    <td className={cn(
+                      "px-4 py-3 text-right font-bold",
+                      item.profitEUR >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    )}>
+                      {item.profitEUR >= 0 ? '+' : ''}{formatCurrency(item.profitEUR)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "font-medium",
+                        item.winRate >= 50 ? "text-green-600" : "text-amber-600"
+                      )}>
+                        {item.winRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-500">
+                      {item.lastActivity ? new Date(item.lastActivity).toLocaleDateString('it-IT') : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
       )}
+
+      {/* Storico Operazioni */}
+      <motion.div
+        className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7 }}
+      >
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            📋 Storico Operazioni
+          </h3>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <select
+                value={selectedEpic}
+                onChange={(e) => setSelectedEpic(e.target.value)}
+                className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5"
+              >
+                <option value="all">Tutti i cross</option>
+                {byInstrument.map(item => (
+                  <option key={item.epic} value={item.epic}>{item.instrument}</option>
+                ))}
+              </select>
+            </div>
+            <select
+              value={tradesLimit}
+              onChange={(e) => setTradesLimit(Number(e.target.value))}
+              className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data/Ora</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cross</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Direzione</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Contratti</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P&L</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {trades.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    Nessuna operazione trovata
+                  </td>
+                </tr>
+              ) : (
+                trades.map((trade) => (
+                  <tr key={trade.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-medium">{trade.date}</span>
+                        <Clock className="w-3.5 h-3.5 text-gray-400 ml-2" />
+                        <span className="text-gray-500">{trade.time}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900 dark:text-white text-sm">
+                        {trade.instrument}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-bold",
+                        trade.direction === 'LONG' 
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                          : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                      )}>
+                        {trade.direction === 'LONG' ? '↑' : '↓'} {trade.direction}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center font-medium text-sm">
+                      {trade.contracts}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                        trade.type === 'Copertura' 
+                          ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                          : trade.type === 'Falciatura'
+                            ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      )}>
+                        {trade.type}
+                      </span>
+                    </td>
+                    <td className={cn(
+                      "px-4 py-3 text-right font-bold",
+                      trade.profitEUR >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    )}>
+                      {trade.profitEUR >= 0 ? '+' : ''}{formatCurrency(trade.profitEUR)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
     </div>
   )
-}
-
-// Componente StatCard riutilizzabile
-interface StatCardProps {
-  title: string
-  value: string
-  icon: React.ElementType
-  trend: 'up' | 'down' | 'neutral'
-  subtitle?: string
-}
-
-function StatCard({ title, value, icon: Icon, trend, subtitle }: StatCardProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      <Card hover>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-              <p className={cn(
-                "text-2xl font-bold mt-1",
-                trend === 'up' ? "text-green-600 dark:text-green-400" :
-                trend === 'down' ? "text-red-600 dark:text-red-400" :
-                "text-gray-900 dark:text-white"
-              )}>
-                {value}
-              </p>
-              {subtitle && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
-              )}
-            </div>
-            <div className={cn(
-              "p-2 rounded-lg",
-              trend === 'up' ? "bg-green-100 dark:bg-green-900/30" :
-              trend === 'down' ? "bg-red-100 dark:bg-red-900/30" :
-              "bg-gray-100 dark:bg-gray-800"
-            )}>
-              <Icon className={cn(
-                "w-5 h-5",
-                trend === 'up' ? "text-green-600 dark:text-green-400" :
-                trend === 'down' ? "text-red-600 dark:text-red-400" :
-                "text-gray-600 dark:text-gray-400"
-              )} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  )
-}
-
-// Helper per formattare tempo fa
-function formatTimeAgo(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffSeconds = Math.floor(diffMs / 1000)
-  const diffMinutes = Math.floor(diffSeconds / 60)
-  const diffHours = Math.floor(diffMinutes / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffSeconds < 60) return 'Ora'
-  if (diffMinutes < 60) return `${diffMinutes}m fa`
-  if (diffHours < 24) return `${diffHours}h fa`
-  if (diffDays < 7) return `${diffDays}g fa`
-  return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
 }

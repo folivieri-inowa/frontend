@@ -4,7 +4,6 @@ import { Sidebar } from '@/components/Sidebar'
 import { Dashboard } from '@/components/Dashboard'
 import { ConsoleView } from '@/components/ConsoleView'
 import { StatisticsView } from '@/components/StatisticsView'
-import { ActivityView } from '@/components/ActivityView'
 import { InstrumentsView } from '@/components/InstrumentsView'
 import { PositionsView } from '@/components/PositionsView'
 import { DatabaseView } from '@/components/DatabaseView'
@@ -112,9 +111,6 @@ function App() {
           )}
           {activeView === 'statistics' && (
             <StatisticsView />
-          )}
-          {activeView === 'activity' && (
-            <ActivityView />
           )}
           {activeView === 'database' && (
             <DatabaseView />
