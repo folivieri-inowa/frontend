@@ -27,6 +27,7 @@ interface InstrumentConfig {
   defaultContracts: number
   defaultTPPoints: number
   orderDistanceDivisor: number
+  restartFineCiclo: boolean
   isActive: boolean
   hasConfig: boolean
 }
@@ -70,7 +71,8 @@ export function InstrumentsView() {
     harvestPercentage: 67,
     defaultContracts: 1,
     defaultTPPoints: 90,
-    orderDistanceDivisor: 3
+    orderDistanceDivisor: 3,
+    restartFineCiclo: true
   })
   
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -180,7 +182,8 @@ export function InstrumentsView() {
       harvestPercentage: instrument.harvestPercentage,
       defaultContracts: instrument.defaultContracts,
       defaultTPPoints: instrument.defaultTPPoints,
-      orderDistanceDivisor: instrument.orderDistanceDivisor || 3
+      orderDistanceDivisor: instrument.orderDistanceDivisor || 3,
+      restartFineCiclo: instrument.restartFineCiclo ?? true
     })
     setShowConfigModal(true)
   }
@@ -863,6 +866,24 @@ export function InstrumentsView() {
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Ordine opposto a TP/{configParams.orderDistanceDivisor} punti dalla posizione
+                  </p>
+                </div>
+
+                {/* Restart Fine Ciclo */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={configParams.restartFineCiclo}
+                      onChange={(e) => setConfigParams({ ...configParams, restartFineCiclo: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Restart Fine Ciclo
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Riavvio automatico dopo falciatura completa (FASE 3 → FASE 1)
                   </p>
                 </div>
               </div>
