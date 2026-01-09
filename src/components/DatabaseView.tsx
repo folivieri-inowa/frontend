@@ -129,7 +129,9 @@ export function DatabaseView() {
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [loadingData, setLoadingData] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
+  const [showResetPositionsModal, setShowResetPositionsModal] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [resettingPositions, setResettingPositions] = useState(false)
 
   // Fetch tabelle e sync status
   const fetchTablesAndSync = useCallback(async () => {
@@ -197,7 +199,7 @@ export function DatabaseView() {
     }
   }
 
-  // Reset database
+  // Reset database completo
   const handleResetDatabase = async () => {
     if (!apiUrl) return
     setResetting(true)
@@ -217,6 +219,29 @@ export function DatabaseView() {
       alert('Errore durante il reset del database')
     } finally {
       setResetting(false)
+    }
+  }
+
+  // Reset solo posizioni/ordini
+  const handleResetPositions = async () => {
+    if (!apiUrl) return
+    setResettingPositions(true)
+    
+    try {
+      const res = await fetch(`${apiUrl}/api/db/reset-positions`, { method: 'POST' })
+      if (res.ok) {
+        setShowResetPositionsModal(false)
+        setSelectedTable(null)
+        setTableData([])
+        await fetchTablesAndSync()
+      } else {
+        alert('Errore durante il reset delle posizioni')
+      }
+    } catch (error) {
+      console.error('Error resetting positions:', error)
+      alert('Errore durante il reset delle posizioni')
+    } finally {
+      setResettingPositions(false)
     }
   }
 
@@ -247,7 +272,7 @@ export function DatabaseView() {
 
   return (
     <div className="space-y-6">
-      {/* Reset Modal */}
+      {/* Reset Database Completo Modal */}
       {showResetModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -260,7 +285,7 @@ export function DatabaseView() {
                 <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Reset Database
+                Reset Database Completo
               </h3>
             </div>
             
@@ -299,7 +324,69 @@ export function DatabaseView() {
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Reset DB
+                    Reset Tutto
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Reset Solo Posizioni/Ordini Modal */}
+      {showResetPositionsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                <RefreshCw className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Reset Posizioni e Ordini
+              </h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Questa operazione eliminerà solo:
+            </p>
+            
+            <ul className="text-sm text-gray-600 dark:text-gray-300 mb-4 space-y-2 list-disc list-inside">
+              <li className="text-amber-600 dark:text-amber-400 font-semibold">Tutte le posizioni aperte</li>
+              <li className="text-amber-600 dark:text-amber-400 font-semibold">Tutti gli ordini pendenti</li>
+            </ul>
+
+            <p className="text-sm text-green-600 dark:text-green-400 mb-6 font-semibold">
+              ✓ Mantiene: Configurazioni, Statistiche, Storico Trade
+            </p>
+            
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setShowResetPositionsModal(false)}
+                variant="secondary"
+                className="flex-1"
+                disabled={resettingPositions}
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleResetPositions}
+                variant="warning"
+                className="flex-1"
+                disabled={resettingPositions}
+              >
+                {resettingPositions ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset Trading
                   </>
                 )}
               </Button>
@@ -321,7 +408,7 @@ export function DatabaseView() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             onClick={() => fetchTablesAndSync()}
             variant="ghost"
@@ -331,12 +418,20 @@ export function DatabaseView() {
             Aggiorna
           </Button>
           <Button 
+            onClick={() => setShowResetPositionsModal(true)}
+            variant="warning"
+            size="sm"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Reset Trading
+          </Button>
+          <Button 
             onClick={() => setShowResetModal(true)}
             variant="danger"
             size="sm"
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            Reset DB
+            Reset Tutto
           </Button>
         </div>
       </div>
