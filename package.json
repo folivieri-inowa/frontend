@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "docker:deploy": "docker buildx build --platform linux/amd64 --push -t docker.inowa.it/genesis/frontend .",
+    "docker:build": "docker buildx build --platform linux/amd64 -t docker.wavetech.it/genesis/frontend:latest -t docker.wavetech.it/genesis/frontend:$(git describe --tags --always) .",
+    "docker:push": "docker push docker.wavetech.it/genesis/frontend --all-tags",
+    "docker:deploy": "docker buildx build --platform linux/amd64 --push -t docker.wavetech.it/genesis/frontend:latest -t docker.wavetech.it/genesis/frontend:$(git describe --tags --always) .",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

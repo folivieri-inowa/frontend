@@ -324,7 +324,8 @@ export function useWebSocket() {
       console.log('🔄 Forcing IG reconnection...')
       const response = await fetch(`${apiUrl}/api/connection/reconnect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
       })
       const result = await response.json()
       
