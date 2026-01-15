@@ -81,6 +81,7 @@ interface InstrumentConfig {
   defaultTPPoints: number
   orderDistanceDivisor: number
   restartFineCiclo: boolean
+  trailingStopEnabled: boolean
   isActive: boolean
   hasConfig: boolean
 }
@@ -126,7 +127,8 @@ export function InstrumentsView() {
     defaultContracts: 1,
     defaultTPPoints: 90,
     orderDistanceDivisor: 3,
-    restartFineCiclo: true
+    restartFineCiclo: true,
+    trailingStopEnabled: false
   })
   
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -273,7 +275,8 @@ export function InstrumentsView() {
       defaultContracts: instrument.defaultContracts,
       defaultTPPoints: instrument.defaultTPPoints,
       orderDistanceDivisor: instrument.orderDistanceDivisor || 3,
-      restartFineCiclo: instrument.restartFineCiclo ?? true
+      restartFineCiclo: instrument.restartFineCiclo ?? true,
+      trailingStopEnabled: instrument.trailingStopEnabled ?? false
     })
     setSavedFalciArray(null) // Reset
     fetchSavedFalciArray(instrument.epic) // Carica array salvato
@@ -427,8 +430,14 @@ export function InstrumentsView() {
       const data = await response.json()
       
       if (data.success) {
-        setShowConfigModal(false)
+        // Ricarica l'array salvato dal DB
+        await fetchSavedFalciArray(selectedInstrument.epic)
+        // Non chiudere il modal, così l'utente vede l'array aggiornato
         fetchInstruments()
+        // Mostra conferma visiva
+        setTimeout(() => {
+          setShowConfigModal(false)
+        }, 1500)
       } else {
         alert(`Errore: ${data.error}`)
       }
@@ -976,6 +985,24 @@ export function InstrumentsView() {
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Riavvio automatico dopo falciatura completa (FASE 3 → FASE 1)
+                  </p>
+                </div>
+
+                {/* Trailing Stop in FASE 1 */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={configParams.trailingStopEnabled}
+                      onChange={(e) => setConfigParams({ ...configParams, trailingStopEnabled: e.target.checked })}
+                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Trailing Stop in FASE 1
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Sostituisce TP fisso con trailing stop (guadagno minimo = TP/2)
                   </p>
                 </div>
 
