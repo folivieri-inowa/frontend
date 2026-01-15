@@ -113,6 +113,7 @@ export function InstrumentsView() {
   const [marketInfo, setMarketInfo] = useState<any>(null)
   const [marketInfoLoading, setMarketInfoLoading] = useState(false)
   const [savedFalciArray, setSavedFalciArray] = useState<number[] | null>(null)
+  const [trailingStopSupported, setTrailingStopSupported] = useState<boolean>(false)
   
   // Form state
   const [startParams, setStartParams] = useState<StartParams>({
@@ -267,6 +268,23 @@ export function InstrumentsView() {
     }
   }
 
+  // Fetch trailing stop support for instrument
+  const fetchTrailingStopSupport = async (epic: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/instruments/${epic}`)
+      const data = await response.json()
+      
+      if (data.success && data.data.marketDetails) {
+        setTrailingStopSupported(data.data.marketDetails.trailingStopsAvailable ?? false)
+      } else {
+        setTrailingStopSupported(false)
+      }
+    } catch (err) {
+      console.error('Error fetching trailing stop support:', err)
+      setTrailingStopSupported(false)
+    }
+  }
+
   // Open config modal
   const handleOpenConfig = (instrument: InstrumentConfig) => {
     setSelectedInstrument(instrument)
@@ -280,6 +298,7 @@ export function InstrumentsView() {
     })
     setSavedFalciArray(null) // Reset
     fetchSavedFalciArray(instrument.epic) // Carica array salvato
+    fetchTrailingStopSupport(instrument.epic) // Verifica supporto trailing
     setShowConfigModal(true)
   }
 
@@ -312,6 +331,12 @@ export function InstrumentsView() {
   // Start instrument
   const handleStart = async () => {
     if (!selectedInstrument) return
+    
+    // Validazione trailing stop
+    if (configParams.trailingStopEnabled && !trailingStopSupported) {
+      alert('⚠️ Trailing Stop non supportato per questo mercato!\n\nDisabilita il trailing stop o scegli un altro strumento.')
+      return
+    }
     
     try {
       setActionLoading(selectedInstrument.epic)
@@ -418,6 +443,12 @@ export function InstrumentsView() {
   // Update config
   const handleUpdateConfig = async () => {
     if (!selectedInstrument) return
+    
+    // Validazione trailing stop
+    if (configParams.trailingStopEnabled && !trailingStopSupported) {
+      alert('⚠️ Trailing Stop non supportato per questo mercato!\n\nDisabilita il trailing stop nella configurazione.')
+      return
+    }
     
     try {
       setActionLoading(selectedInstrument.epic)
@@ -990,17 +1021,29 @@ export function InstrumentsView() {
 
                 {/* Trailing Stop in FASE 1 */}
                 <div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={configParams.trailingStopEnabled}
-                      onChange={(e) => setConfigParams({ ...configParams, trailingStopEnabled: e.target.checked })}
-                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Trailing Stop in FASE 1
-                    </span>
-                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configParams.trailingStopEnabled}
+                        onChange={(e) => setConfigParams({ ...configParams, trailingStopEnabled: e.target.checked })}
+                        className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
+                        disabled={!trailingStopSupported}
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Trailing Stop in FASE 1
+                      </span>
+                    </label>
+                    {trailingStopSupported ? (
+                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full font-medium">
+                        Supportato
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded-full font-medium">
+                        Non supportato
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Sostituisce TP fisso con trailing stop (guadagno minimo = TP/2)
                   </p>
