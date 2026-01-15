@@ -906,24 +906,24 @@ export function InstrumentsView() {
       <AnimatePresence>
         {showConfigModal && selectedInstrument && (
           <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowConfigModal(false)}
           >
             <motion.div
-              className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl"
+              className="bg-white dark:bg-gray-800 rounded-xl p-4 w-full max-w-md shadow-xl max-h-[90vh] flex flex-col"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
                 Configura {selectedInstrument.name}
               </h3>
               
-              <div className="space-y-4">
+              <div className="space-y-3 overflow-y-auto flex-1 pr-2">
                 {/* Harvest Percentage */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -942,7 +942,7 @@ export function InstrumentsView() {
                       {configParams.harvestPercentage}%
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     Percentuale del profitto da falciare automaticamente
                   </p>
                 </div>
@@ -958,7 +958,7 @@ export function InstrumentsView() {
                     max="100"
                     value={configParams.defaultContracts}
                     onChange={(e) => setConfigParams({ ...configParams, defaultContracts: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -973,7 +973,7 @@ export function InstrumentsView() {
                     step="0.1"
                     value={configParams.defaultTPPoints}
                     onChange={(e) => setConfigParams({ ...configParams, defaultTPPoints: parseFloat(e.target.value) || 10 })}
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -1050,14 +1050,14 @@ export function InstrumentsView() {
                 </div>
 
                 {/* 🧮 Array Falci Preview & Verifica DB */}
-                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center gap-2 mb-3">
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
                     <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                       Array Falci - Sequenza Chiusura Contratti
                     </h4>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {/* Preview calcolato */}
                     <div>
                       <div className="flex items-center gap-2 text-sm mb-1">
@@ -1107,15 +1107,15 @@ export function InstrumentsView() {
                       )}
                     </div>
 
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed pt-2 border-t border-blue-200 dark:border-blue-700">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed pt-1.5 border-t border-blue-200 dark:border-blue-700">
                       💡 La sequenza indica quanti contratti verranno chiusi ad ogni Take Profit in FASE 2.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 mt-6">
+              {/* Actions - Fixed at bottom */}
+              <div className="flex gap-3 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setShowConfigModal(false)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
