@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   TrendingUp, 
@@ -18,6 +18,59 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+
+/**
+ * 🧮 ALGORITMO FALCI - Calcola array di falciatura ottimale
+ * Identico alla funzione backend per preview
+ */
+function calculateFalciArray(
+  contracts: number,
+  tpPoints: number,
+  orderDistanceDivisor: number,
+  harvestPct: number
+): number[] {
+  const falci: number[] = [];
+  const banda = tpPoints / orderDistanceDivisor;
+  const profit = contracts * tpPoints;
+  const reinv = profit * harvestPct;
+
+  let ct = contracts;
+  let n = 1;
+
+  while (ct > 0.05) {
+    const loss = ((tpPoints * n) + banda) * ct;
+
+    if (reinv < loss) {
+      const flp = Math.floor((reinv * 100) / loss);
+      const falcioContractsRaw = (ct * flp) / 100;
+      const rounded = Math.floor(falcioContractsRaw * 10) / 10;
+
+      if (rounded <= 0 && ct > 0.05) {
+        falci.push(0.1);
+        ct = Math.round((ct - 0.1) * 10) / 10;
+      } else if (rounded > 0) {
+        falci.push(rounded);
+        ct = Math.round((ct - rounded) * 10) / 10;
+      } else {
+        break;
+      }
+      n++;
+    } else {
+      const rounded = Math.round(ct * 10) / 10;
+      if (rounded > 0) falci.push(rounded);
+      ct = 0;
+    }
+
+    if (n > 20) {
+      if (ct > 0) {
+        falci.push(Math.round(ct * 10) / 10);
+      }
+      break;
+    }
+  }
+
+  return falci;
+}
 
 interface InstrumentConfig {
   epic: string
@@ -58,6 +111,7 @@ export function InstrumentsView() {
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentConfig | null>(null)
   const [marketInfo, setMarketInfo] = useState<any>(null)
   const [marketInfoLoading, setMarketInfoLoading] = useState(false)
+  const [savedFalciArray, setSavedFalciArray] = useState<number[] | null>(null)
   
   // Form state
   const [startParams, setStartParams] = useState<StartParams>({
@@ -76,6 +130,22 @@ export function InstrumentsView() {
   })
   
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // 🧮 Calcola array falci in tempo reale per anteprima
+  const previewFalciArray = useMemo(() => {
+    const harvestPctDecimal = configParams.harvestPercentage / 100;
+    return calculateFalciArray(
+      configParams.defaultContracts,
+      configParams.defaultTPPoints,
+      configParams.orderDistanceDivisor,
+      harvestPctDecimal
+    );
+  }, [
+    configParams.defaultContracts,
+    configParams.defaultTPPoints,
+    configParams.orderDistanceDivisor,
+    configParams.harvestPercentage
+  ]);
 
   // Fetch instruments from backend
   const fetchInstruments = async () => {
@@ -175,6 +245,26 @@ export function InstrumentsView() {
     setShowStartModal(true)
   }
 
+  // Fetch saved falci array from DB
+  const fetchSavedFalciArray = async (epic: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/instruments/${epic}`)
+      const data = await response.json()
+      
+      if (data.success && data.data?.metadata) {
+        const metadata = typeof data.data.metadata === 'string' 
+          ? JSON.parse(data.data.metadata) 
+          : data.data.metadata
+        setSavedFalciArray(metadata?.strategyConfig?.pascalFalciArray || null)
+      } else {
+        setSavedFalciArray(null)
+      }
+    } catch (err) {
+      console.error('Error fetching saved falci array:', err)
+      setSavedFalciArray(null)
+    }
+  }
+
   // Open config modal
   const handleOpenConfig = (instrument: InstrumentConfig) => {
     setSelectedInstrument(instrument)
@@ -185,6 +275,8 @@ export function InstrumentsView() {
       orderDistanceDivisor: instrument.orderDistanceDivisor || 3,
       restartFineCiclo: instrument.restartFineCiclo ?? true
     })
+    setSavedFalciArray(null) // Reset
+    fetchSavedFalciArray(instrument.epic) // Carica array salvato
     setShowConfigModal(true)
   }
 
@@ -885,6 +977,70 @@ export function InstrumentsView() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Riavvio automatico dopo falciatura completa (FASE 3 → FASE 1)
                   </p>
+                </div>
+
+                {/* 🧮 Array Falci Preview & Verifica DB */}
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      Array Falci - Sequenza Chiusura Contratti
+                    </h4>
+                  </div>
+                  <div className="space-y-3">
+                    {/* Preview calcolato */}
+                    <div>
+                      <div className="flex items-center gap-2 text-sm mb-1">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">📊 Anteprima (calcolato):</span>
+                      </div>
+                      <code className="block px-3 py-2 bg-white dark:bg-gray-800 rounded text-blue-600 dark:text-blue-400 font-mono text-xs">
+                        [{previewFalciArray.map(v => v.toFixed(1)).join(', ')}]
+                      </code>
+                      <div className="flex items-center gap-2 text-xs mt-1 text-gray-500 dark:text-gray-400">
+                        <span>Falci: <strong>{previewFalciArray.length}</strong></span>
+                        <span>•</span>
+                        <span>Totale: <strong>{previewFalciArray.reduce((a, b) => a + b, 0).toFixed(1)}</strong> contratti</span>
+                      </div>
+                    </div>
+
+                    {/* Array salvato nel DB */}
+                    <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                      <div className="flex items-center gap-2 text-sm mb-1">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">💾 Salvato nel DB:</span>
+                      </div>
+                      {savedFalciArray ? (
+                        <>
+                          <code className={cn(
+                            "block px-3 py-2 bg-white dark:bg-gray-800 rounded font-mono text-xs",
+                            JSON.stringify(savedFalciArray) === JSON.stringify(previewFalciArray)
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-orange-600 dark:text-orange-400"
+                          )}>
+                            [{savedFalciArray.map(v => v.toFixed(1)).join(', ')}]
+                          </code>
+                          {JSON.stringify(savedFalciArray) === JSON.stringify(previewFalciArray) ? (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              Array sincronizzato con anteprima
+                            </p>
+                          ) : (
+                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              Array diverso - Salva per aggiornare
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          ❌ Non ancora salvato - Salva configurazione per generare array
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed pt-2 border-t border-blue-200 dark:border-blue-700">
+                      💡 La sequenza indica quanti contratti verranno chiusi ad ogni Take Profit in FASE 2.
+                    </p>
+                  </div>
                 </div>
               </div>
 
